@@ -166,7 +166,7 @@ def test_platforms_added_to_workspace_single_platform():
 """)
 
         # Initialize with single platform
-        init_workspace("humble", workspace_path, platforms=["linux"])
+        init_workspace("humble", workspace_path, platforms=["linux-64"])
 
         # Check pixi.toml was created
         toml_path = workspace_path / "pixi.toml"
@@ -204,7 +204,7 @@ def test_platforms_added_to_workspace_multiple_platforms():
 """)
 
         # Initialize with multiple platforms
-        init_workspace("humble", workspace_path, platforms=["linux", "osx", "win64"])
+        init_workspace("humble", workspace_path, platforms=["linux-64", "osx-64", "osx-arm64", "win-64"])
 
         # Check pixi.toml was created
         toml_path = workspace_path / "pixi.toml"
@@ -217,12 +217,9 @@ def test_platforms_added_to_workspace_multiple_platforms():
 
         assert "workspace" in config
         assert "platforms" in config["workspace"]
-        # osx should expand to both osx-64 and osx-arm64
+        # All platforms should be in the list
         platforms = config["workspace"]["platforms"]
-        assert "linux-64" in platforms
-        assert "osx-64" in platforms
-        assert "osx-arm64" in platforms
-        assert "win-64" in platforms
+        assert platforms == ["linux-64", "osx-64", "osx-arm64", "win-64"]
 
 
 def test_target_sections_created_for_platform_specific_deps():
@@ -248,7 +245,7 @@ def test_target_sections_created_for_platform_specific_deps():
 """)
 
         # Initialize with multiple platforms
-        init_workspace("humble", workspace_path, platforms=["linux", "osx"])
+        init_workspace("humble", workspace_path, platforms=["linux-64", "osx-arm64"])
 
         # Check pixi.toml was created
         toml_path = workspace_path / "pixi.toml"
@@ -300,7 +297,7 @@ def test_common_dependencies_in_main_section():
 """)
 
         # Initialize with multiple platforms
-        init_workspace("humble", workspace_path, platforms=["linux", "osx"])
+        init_workspace("humble", workspace_path, platforms=["linux-64", "osx-arm64"])
 
         # Check pixi.toml was created
         toml_path = workspace_path / "pixi.toml"

@@ -257,37 +257,37 @@ def is_system_package(package_name: str) -> bool:
 
 def get_platforms() -> list[str]:
     """
-    Get list of supported platforms from mapping files.
+    Get list of supported pixi platforms based on mapping files.
 
-    Extracts platform names from the mapping data structure.
-    Common platforms: linux, osx, win64
+    Extracts platform names from the mapping data and converts them to
+    standard pixi platform names.
+
+    Mapping files use: linux, osx, win64
+    Pixi uses: linux-64, osx-64, osx-arm64, win-64
 
     Returns:
-        List of platform names used in mappings
+        List of pixi platform names
     """
     mappings = get_mappings()
-    platforms = set()
+    mapping_platforms = set()
 
     # Iterate through mappings to find all platform keys
     for package_mappings in mappings.values():
         for channel_mapping in package_mappings.values():
             if isinstance(channel_mapping, dict):
                 # This is a platform-specific mapping
-                platforms.update(channel_mapping.keys())
+                mapping_platforms.update(channel_mapping.keys())
 
-    # Return sorted list, with common order
-    platform_order = ["linux", "osx", "win64", "win"]
-    result = []
-    for p in platform_order:
-        if p in platforms:
-            result.append(p)
+    # Convert mapping platforms to pixi platforms
+    pixi_platforms = []
+    if "linux" in mapping_platforms:
+        pixi_platforms.append("linux-64")
+    if "osx" in mapping_platforms:
+        pixi_platforms.extend(["osx-64", "osx-arm64"])
+    if "win64" in mapping_platforms or "win" in mapping_platforms:
+        pixi_platforms.append("win-64")
 
-    # Add any other platforms not in the predefined order
-    for p in sorted(platforms):
-        if p not in result:
-            result.append(p)
-
-    return result if result else ["linux", "osx", "win64"]
+    return pixi_platforms if pixi_platforms else ["linux-64", "osx-64", "osx-arm64", "win-64"]
 
 
 def get_ros_distros() -> list[str]:

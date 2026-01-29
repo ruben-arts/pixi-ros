@@ -71,13 +71,16 @@ pixi shell
 
 ### Dependency Mapping
 
-`pixi-ros` reads all dependency types from `package.xml` files. 
+`pixi-ros` reads all dependency types from `package.xml` files.
 It then does a best effort mapping of ROS package names to conda packages.
 
 - **ROS packages**: `ros-{distro}-{package}` from robostack channels (e.g., `ros-humble-rclcpp`)
 - **System packages**: Mapped to conda-forge equivalents (e.g., `cmake`, `eigen`)
+- **Platform-specific packages**: Different mappings per platform (e.g., OpenGL → `libgl-devel` on Linux, X11 packages on macOS)
 
-After the mapping, it validates package availability in the configured channels. This starts a connection with `https://prefix.dev` to check if packages exist.
+The mapping rules are defined in YAML files (see `src/pixi_ros/data/conda-forge.yaml`) and can be customized by placing your own mapping files in `pixi-ros/*.yaml` or `~/.pixi-ros/*.yaml`.
+
+After the mapping, it validates package availability in the configured channels for each target platform. This starts a connection with `https://prefix.dev` to check if packages exist.
 
 ### Example
 
@@ -113,23 +116,99 @@ Initialize or update a ROS workspace's `pixi.toml`.
 
 ```bash
 pixi-ros init --distro <ros_distro>
+pixi-ros init --distro humble --platform linux-64 --platform osx-arm64
 pixi-ros init
 ```
 
 **Options:**
-- `--distro`, `-d`: ROS distribution (optional)
+- `--distro`, `-d`: ROS distribution (optional, will prompt if not provided)
+- `--platform`, `-p`: Target platforms (optional, can be specified multiple times, will prompt if not provided)
+  - Available: `linux-64`, `osx-64`, `osx-arm64`, `win-64`
+  - Platforms come from the mapping files and determine which dependencies are available
 
 **What it does:**
 - Scans workspace for `package.xml` files
 - Reads all dependency types (build, exec, test)
-- Maps ROS dependencies to conda packages
+- Maps ROS dependencies to conda packages for each platform
 - Configures robostack channels
-- Checks package availability
+- Checks package availability per platform
 - Creates build tasks using colcon
 - Generates helpful `README_PIXI.md`
+- Sets up platform-specific dependencies in `pixi.toml`
 
 **Running multiple times:**
 The command is idempotent - you can run it multiple times to update dependencies as your workspace changes.
+
+## Multi-Platform Support
+
+`pixi-ros` supports generating cross-platform configurations. When you specify multiple platforms, it:
+
+1. **Analyzes dependencies per platform**: Some packages have platform-specific mappings (e.g., OpenGL requirements differ between Linux and macOS)
+
+2. **Organizes dependencies intelligently**:
+   - **Common dependencies** (available on all platforms) → `[dependencies]`
+   - **Platform-specific dependencies** → `[target.{platform}.dependencies]`
+
+3. **Sets up correct platform list**: The `[workspace]` section gets the appropriate pixi platform names
+
+### Platform Naming
+
+pixi-ros uses standard pixi platform names:
+- `linux-64` - Linux x86_64
+- `osx-64` - macOS Intel
+- `osx-arm64` - macOS Apple Silicon (M1/M2/M3)
+- `win-64` - Windows x86_64
+
+Internally, mapping files use a simplified format (`linux`, `osx`, `win64`), but this is transparent to users. When you specify `osx-64` and `osx-arm64`, they both use the same `osx` mapping rules since package availability is typically the same for both architectures.
+
+### Example: Multi-Platform Setup
+
+```bash
+pixi-ros init --distro humble --platform linux-64 --platform osx-arm64
+```
+
+Generates:
+
+```toml
+[workspace]
+name = "my_workspace"
+channels = [
+    "https://prefix.dev/robostack-humble",
+    "https://prefix.dev/conda-forge",
+]
+platforms = ["linux-64", "osx-arm64"]
+
+[dependencies]
+# Common dependencies (available on all platforms)
+ros-humble-rclcpp = "*"
+ros-humble-std-msgs = "*"
+
+[target.linux.dependencies]
+# Linux-specific dependencies
+libgl-devel = "*"
+libopengl-devel = "*"
+
+[target.osx.dependencies]
+# macOS-specific dependencies
+xorg-libx11 = "*"
+xorg-libxext = "*"
+```
+
+### Interactive Platform Selection
+
+If you don't specify platforms, you'll be prompted:
+
+```bash
+$ pixi-ros init --distro humble
+
+Available target platforms:
+  1. linux-64
+  2. osx-64
+  3. osx-arm64
+  4. win-64
+
+Select platforms (enter numbers or names, comma or space separated): 1 3
+```
 
 ## Philosophy
 

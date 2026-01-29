@@ -32,7 +32,7 @@ def init(
         typer.Option(
             "--platform",
             "-p",
-            help="Target platforms (e.g., linux, osx, win64). Can be specified multiple times.",
+            help="Target platforms (e.g., linux-64, osx-arm64, win-64). Can be specified multiple times.",
         ),
     ] = None,
 ):

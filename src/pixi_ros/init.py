@@ -257,21 +257,8 @@ def _ensure_workspace_section(
     # Set platforms if not present or if platforms were provided
     if "platforms" not in workspace or platforms:
         if platforms:
-            # Convert mapping platform names to pixi platform names
-            # Mapping: linux, osx, win64 -> pixi: linux-64, osx-64/osx-arm64, win-64
-            pixi_platforms = []
-            for platform in platforms:
-                if platform == "linux":
-                    pixi_platforms.append("linux-64")
-                elif platform == "osx":
-                    # Add both Intel and ARM for osx
-                    pixi_platforms.extend(["osx-64", "osx-arm64"])
-                elif platform == "win64":
-                    pixi_platforms.append("win-64")
-                else:
-                    # Unknown platform, add as-is
-                    pixi_platforms.append(platform)
-            workspace["platforms"] = pixi_platforms
+            # Platforms are already in pixi format (linux-64, osx-64, etc.)
+            workspace["platforms"] = platforms
         else:
             # Only add the current platform by default
             current_platform = str(Platform.current())
@@ -378,26 +365,41 @@ def _ensure_dependencies(
         if cmake_version:
             dep_versions["cmake"] = cmake_version
 
-    # Platforms now come directly from mappings (linux, osx, win64)
-    # Use them directly as both platform_override and target names
+    # Platforms come from CLI as pixi platform names (linux-64, osx-64, etc.)
+    # Map them to mapping platform names for querying the mapping files
+    pixi_to_mapping = {
+        "linux-64": "linux",
+        "osx-64": "osx",
+        "osx-arm64": "osx",
+        "win-64": "win64",
+    }
 
-    # Collect dependencies per platform
-    # Structure: platform -> conda_dep -> set of ROS package names
+    # Group pixi platforms by their mapping platform
+    # This way osx-64 and osx-arm64 share the same dependencies
+    platform_groups = {}
+    for platform in platforms:
+        mapping_platform = pixi_to_mapping.get(platform, "linux")
+        if mapping_platform not in platform_groups:
+            platform_groups[mapping_platform] = []
+        platform_groups[mapping_platform].append(platform)
+
+    # Collect dependencies per mapping platform (which groups similar pixi platforms)
+    # Structure: mapping_platform -> conda_dep -> set of ROS package names
     platform_deps: dict[str, dict[str, set[str]]] = {
-        platform: {} for platform in platforms
+        mapping_platform: {} for mapping_platform in platform_groups.keys()
     }
 
     # Collect dependencies from each package, mapped for each platform
-    for platform in platforms:
+    for mapping_platform in platform_groups.keys():
         for pkg in packages:
             for ros_dep in pkg.get_all_dependencies():
                 # Skip workspace packages (they're built locally)
                 if ros_dep in workspace_pkg_names:
                     continue
 
-                # Map to conda packages for this platform
+                # Map to conda packages for this mapping platform
                 conda_packages = map_ros_to_conda(
-                    ros_dep, distro, platform_override=platform
+                    ros_dep, distro, platform_override=mapping_platform
                 )
 
                 # Skip if no conda packages were returned
@@ -406,21 +408,21 @@ def _ensure_dependencies(
 
                 for conda_dep in conda_packages:
                     if conda_dep:
-                        if conda_dep not in platform_deps[platform]:
-                            platform_deps[platform][conda_dep] = set()
-                        platform_deps[platform][conda_dep].add(pkg.name)
+                        if conda_dep not in platform_deps[mapping_platform]:
+                            platform_deps[mapping_platform][conda_dep] = set()
+                        platform_deps[mapping_platform][conda_dep].add(pkg.name)
 
-        # Expand GL requirements for this platform
-        all_conda_packages = list(platform_deps[platform].keys())
+        # Expand GL requirements for this mapping platform
+        all_conda_packages = list(platform_deps[mapping_platform].keys())
         expanded_packages = expand_gl_requirements(
-            all_conda_packages, platform_override=platform
+            all_conda_packages, platform_override=mapping_platform
         )
 
         # Rebuild platform deps with expanded packages
         expanded_platform_deps: dict[str, set[str]] = {}
         for expanded_pkg in expanded_packages:
             sources = set()
-            for original_pkg, pkg_sources in platform_deps[platform].items():
+            for original_pkg, pkg_sources in platform_deps[mapping_platform].items():
                 if original_pkg == expanded_pkg:
                     sources.update(pkg_sources)
                 elif original_pkg in ("REQUIRE_GL", "REQUIRE_OPENGL"):
@@ -429,23 +431,24 @@ def _ensure_dependencies(
             if sources:
                 expanded_platform_deps[expanded_pkg] = sources
 
-        platform_deps[platform] = expanded_platform_deps
+        platform_deps[mapping_platform] = expanded_platform_deps
 
-    # Determine common dependencies (present in all platforms)
-    if len(platforms) > 1:
-        all_deps = set(platform_deps[platforms[0]].keys())
-        for platform in platforms[1:]:
-            all_deps &= set(platform_deps[platform].keys())
+    # Determine common dependencies (present in all mapping platforms)
+    mapping_platform_list = list(platform_groups.keys())
+    if len(mapping_platform_list) > 1:
+        all_deps = set(platform_deps[mapping_platform_list[0]].keys())
+        for mapping_platform in mapping_platform_list[1:]:
+            all_deps &= set(platform_deps[mapping_platform].keys())
         common_deps = all_deps
     else:
-        # Single platform - all deps are "common"
-        common_deps = set(platform_deps[platforms[0]].keys())
+        # Single mapping platform - all deps are "common"
+        common_deps = set(platform_deps[mapping_platform_list[0]].keys())
 
     # For backwards compatibility when single platform, use old behavior
-    dep_sources = platform_deps[platforms[0]] if len(platforms) == 1 else {
-        dep: platform_deps[platforms[0]][dep]
+    dep_sources = platform_deps[mapping_platform_list[0]] if len(mapping_platform_list) == 1 else {
+        dep: platform_deps[mapping_platform_list[0]][dep]
         for dep in common_deps
-        if dep in platform_deps[platforms[0]]
+        if dep in platform_deps[mapping_platform_list[0]]
     }
 
     # Create or get dependencies table
@@ -493,21 +496,14 @@ def _ensure_dependencies(
     # Add common dependencies (available on all platforms)
     if dep_sources:
         dependencies.add(tomlkit.nl())
-        if len(platforms) > 1:
+        if len(mapping_platform_list) > 1:
             dependencies.add(tomlkit.comment("Workspace dependencies (common across platforms)"))
         else:
             dependencies.add(tomlkit.comment("Workspace dependencies"))
 
-        # For common deps, check on first platform as representative
-        first_platform_name = platforms[0]
-        # Map platform name to rattler Platform
-        platform_rattler_map = {
-            "linux": "linux-64",
-            "osx": "osx-arm64",
-            "win64": "win-64",
-        }
-        first_platform_str = platform_rattler_map.get(first_platform_name, "linux-64")
-        first_platform = Platform(first_platform_str)
+        # For common deps, check on first pixi platform as representative
+        first_pixi_platform = platforms[0]
+        first_platform = Platform(first_pixi_platform)
 
         packages_to_check = [
             conda_dep
@@ -517,7 +513,7 @@ def _ensure_dependencies(
 
         availability = {}
         if channels and packages_to_check:
-            typer.echo(f"Checking common package availability for {first_platform_name}...")
+            typer.echo(f"Checking common package availability for {first_pixi_platform}...")
             availability = _check_package_availability(
                 packages_to_check, channels, first_platform
             )
@@ -552,12 +548,12 @@ def _ensure_dependencies(
 
     config["dependencies"] = dependencies
 
-    # Add platform-specific dependencies if multiple platforms
-    if len(platforms) > 1:
-        for platform in platforms:
+    # Add platform-specific dependencies if multiple mapping platforms
+    if len(mapping_platform_list) > 1:
+        for mapping_platform in mapping_platform_list:
             platform_specific_deps = {
                 dep: sources
-                for dep, sources in platform_deps[platform].items()
+                for dep, sources in platform_deps[mapping_platform].items()
                 if dep not in common_deps
             }
 
@@ -565,33 +561,28 @@ def _ensure_dependencies(
                 # Create target section if needed
                 if "target" not in config:
                     config["target"] = tomlkit.table()
-                if platform not in config["target"]:
-                    config["target"][platform] = tomlkit.table()
-                if "dependencies" not in config["target"][platform]:
-                    config["target"][platform]["dependencies"] = tomlkit.table()
+                if mapping_platform not in config["target"]:
+                    config["target"][mapping_platform] = tomlkit.table()
+                if "dependencies" not in config["target"][mapping_platform]:
+                    config["target"][mapping_platform]["dependencies"] = tomlkit.table()
 
-                target_deps = config["target"][platform]["dependencies"]
+                target_deps = config["target"][mapping_platform]["dependencies"]
 
                 # Add comment
                 if len(target_deps) == 0:
                     target_deps.add(
-                        tomlkit.comment(f"Platform-specific dependencies for {platform}")
+                        tomlkit.comment(f"Platform-specific dependencies for {mapping_platform}")
                     )
 
-                # Check availability for this platform
-                # Map platform name to rattler Platform if needed
-                platform_rattler_map = {
-                    "linux": "linux-64",
-                    "osx": "osx-arm64",  # Use ARM as default for osx
-                    "win64": "win-64",
-                }
-                rattler_platform_str = platform_rattler_map.get(platform, "linux-64")
-                platform_obj = Platform(rattler_platform_str)
+                # Check availability for this mapping platform
+                # Use the first pixi platform in the group as representative
+                representative_pixi_platform = platform_groups[mapping_platform][0]
+                platform_obj = Platform(representative_pixi_platform)
                 packages_to_check = list(platform_specific_deps.keys())
 
                 availability = {}
                 if channels and packages_to_check:
-                    typer.echo(f"Checking package availability for {platform}...")
+                    typer.echo(f"Checking package availability for {mapping_platform}...")
                     availability = _check_package_availability(
                         packages_to_check, channels, platform_obj
                     )
