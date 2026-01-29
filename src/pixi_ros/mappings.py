@@ -170,7 +170,7 @@ def expand_gl_requirements(
     https://github.com/RoboStack/vinca/blob/7d3a05e01d6898201a66ba2cf6ea771250671f58/vinca/main.py#L562
 
     Args:
-        conda_packages: List of conda package names (may contain REQUIRE_GL/REQUIRE_OPENGL)
+        conda_packages: List of conda package names (may contain REQUIRE_(OPEN)GL)
         platform_override: Override platform detection (for testing)
 
     Returns:
@@ -296,18 +296,3 @@ def get_mapping_files_dir() -> Path:
 
     # Return built-in default path
     return Path(__file__).parent / "data"
-
-
-# Deprecated: kept for backward compatibility
-def get_robostack_yaml_path() -> Path | None:
-    """
-    Get the path to mapping files directory.
-
-    Deprecated: Use get_mapping_files_dir() instead.
-
-    Returns:
-        Path to first .yaml file found, or None
-    """
-    mapping_dir = get_mapping_files_dir()
-    yaml_files = list(mapping_dir.glob("*.yaml"))
-    return yaml_files[0] if yaml_files else None

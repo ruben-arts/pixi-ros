@@ -45,19 +45,25 @@ def init(
         # Parse selection (either number or name)
         try:
             selection_num = int(selection)
-            if 1 <= selection_num <= len(available_distros):
+            dist_count = len(available_distros)
+            if 1 <= selection_num <= dist_count:
                 distro = available_distros[selection_num - 1]
             else:
-                typer.echo(f"Error: Invalid selection. Please choose 1-{len(available_distros)}", err=True)
+                typer.echo(
+                    f"Error: Invalid selection.Please choose 1-{dist_count}",
+                    err=True,
+                )
                 raise typer.Exit(code=1)
-        except ValueError:
+        except ValueError as err:
             # User entered a name instead of number
             if selection in available_distros:
                 distro = selection
             else:
-                typer.echo(f"Error: '{selection}' is not a valid ROS distribution", err=True)
+                typer.echo(
+                    f"Error: '{selection}' is not a valid ROS distribution", err=True
+                )
                 typer.echo(f"Available: {', '.join(available_distros)}", err=True)
-                raise typer.Exit(code=1)
+                raise typer.Exit(code=1) from err
 
     init_workspace(distro)
 

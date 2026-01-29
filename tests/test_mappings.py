@@ -8,7 +8,6 @@ import pytest
 from pixi_ros.mappings import (
     expand_gl_requirements,
     get_mappings,
-    get_robostack_yaml_path,
     get_ros_distros,
     is_system_package,
     map_ros_to_conda,
@@ -65,21 +64,21 @@ def test_is_system_package():
 def test_get_ros_distros():
     """Test getting list of supported distros."""
     distros = get_ros_distros()
+    assert "foxy" in distros
     assert "humble" in distros
-    assert "iron" in distros
     assert "jazzy" in distros
-    assert "rolling" in distros
+    assert "kilted" in distros
     assert isinstance(distros, list)
 
 
 def test_validate_distro():
     """Test distro validation."""
+    assert validate_distro("foxy")
     assert validate_distro("humble")
-    assert validate_distro("iron")
     assert validate_distro("jazzy")
-    assert validate_distro("rolling")
+    assert validate_distro("kilted")
     assert not validate_distro("invalid")
-    assert not validate_distro("foxy")  # Not in our list
+    assert not validate_distro("iron")  # Not in current list
 
 
 @pytest.mark.parametrize(
@@ -105,15 +104,6 @@ def test_get_mappings():
     # Check for some system packages from conda-forge.yaml
     assert "cmake" in mappings
     assert "uncrustify" in mappings
-
-
-def test_get_robostack_yaml_path():
-    """Test getting the path to mapping files."""
-    path = get_robostack_yaml_path()
-    assert path is not None
-    assert path.exists()
-    # Should return a .yaml file (like conda-forge.yaml)
-    assert path.suffix == ".yaml"
 
 
 def test_reload_mappings():

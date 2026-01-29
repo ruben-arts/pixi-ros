@@ -116,7 +116,9 @@ def init_workspace(distro: str, workspace_path: Path | None = None) -> bool:
 
         if readme_created:
             content.append("📖 Created README_PIXI.md\n", style="green bold")
-            content.append("   Check it out for detailed usage instructions!\n\n", style="dim")
+            content.append(
+                "   Check it out for detailed usage instructions!\n\n", style="dim"
+            )
 
         content.append("Next steps:\n", style="cyan bold")
         content.append("  1. Install dependencies:  ", style="white")
@@ -287,7 +289,7 @@ def _check_package_availability(
     """
     import asyncio
 
-    availability = {pkg: False for pkg in packages}
+    availability = dict.fromkeys(packages, False)
 
     try:
         # Create gateway for fetching repo data
