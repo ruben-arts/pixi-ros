@@ -314,3 +314,53 @@ def test_common_dependencies_in_main_section():
 
         # Check for rclcpp (common across platforms)
         assert any("rclcpp" in str(dep) for dep in dependencies.keys())
+
+
+def test_unix_target_for_linux_and_osx_deps():
+    """Test that dependencies on both Linux and macOS go to unix target section."""
+    from pixi_ros.init import init_workspace
+
+    with TemporaryDirectory() as tmpdir:
+        workspace_path = Path(tmpdir)
+        src_dir = workspace_path / "src"
+        src_dir.mkdir()
+
+        # Create package.xml with opengl dependency
+        # OpenGL requires X11 packages on both linux and osx, but different GL packages on linux only
+        pkg_xml = src_dir / "package.xml"
+        pkg_xml.write_text("""<?xml version="1.0"?>
+<package format="2">
+    <name>test_pkg</name>
+    <version>0.0.1</version>
+    <description>Test</description>
+    <maintainer email="test@test.com">Test</maintainer>
+    <license>MIT</license>
+    <depend>opengl</depend>
+</package>
+""")
+
+        # Initialize with Linux and macOS (no Windows)
+        init_workspace("humble", workspace_path, platforms=["linux-64", "osx-arm64"])
+
+        # Check pixi.toml was created
+        toml_path = workspace_path / "pixi.toml"
+        assert toml_path.exists()
+
+        # Parse and check target sections
+        import tomlkit
+        with open(toml_path) as f:
+            config = tomlkit.load(f)
+
+        # Unix target section should exist for shared dependencies
+        if "target" in config and "unix" in config["target"]:
+            assert "dependencies" in config["target"]["unix"]
+            unix_deps = config["target"]["unix"]["dependencies"]
+            # X11 packages should be in unix (shared between linux and osx)
+            assert any("x11" in str(dep).lower() or "xorg" in str(dep).lower() for dep in unix_deps.keys())
+
+        # Linux-specific section should have GL packages not in unix
+        if "target" in config and "linux" in config["target"]:
+            assert "dependencies" in config["target"]["linux"]
+            linux_deps = config["target"]["linux"]["dependencies"]
+            # GL packages specific to Linux
+            assert any("libgl-devel" in str(dep).lower() or "libopengl-devel" in str(dep).lower() for dep in linux_deps.keys())

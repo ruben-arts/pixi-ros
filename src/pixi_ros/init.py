@@ -549,12 +549,92 @@ def _ensure_dependencies(
     config["dependencies"] = dependencies
 
     # Add platform-specific dependencies if multiple mapping platforms
+    # First, identify unix dependencies (available on both linux and osx, but not win)
+    unix_deps = {}
+    if len(mapping_platform_list) > 1:
+        has_linux = "linux" in mapping_platform_list
+        has_osx = "osx" in mapping_platform_list
+        has_win = "win64" in mapping_platform_list or "win" in mapping_platform_list
+
+        if has_linux and has_osx:
+            # Find deps that are on both linux and osx
+            linux_only = set(platform_deps.get("linux", {}).keys())
+            osx_only = set(platform_deps.get("osx", {}).keys())
+            unix_candidates = (linux_only & osx_only) - common_deps
+
+            # If we also have windows, only move to unix if NOT on windows
+            if has_win:
+                win_deps = set(platform_deps.get("win64", {}).keys()) | set(platform_deps.get("win", {}).keys())
+                unix_deps_keys = unix_candidates - win_deps
+            else:
+                unix_deps_keys = unix_candidates
+
+            # Move to unix section
+            for dep in unix_deps_keys:
+                if dep in platform_deps.get("linux", {}):
+                    unix_deps[dep] = platform_deps["linux"][dep]
+
+        # Add unix section if there are unix-specific dependencies
+        if unix_deps:
+            if "target" not in config:
+                config["target"] = tomlkit.table()
+            if "unix" not in config["target"]:
+                config["target"]["unix"] = tomlkit.table()
+            if "dependencies" not in config["target"]["unix"]:
+                config["target"]["unix"]["dependencies"] = tomlkit.table()
+
+            target_deps = config["target"]["unix"]["dependencies"]
+
+            if len(target_deps) == 0:
+                target_deps.add(
+                    tomlkit.comment("Unix-specific dependencies (Linux and macOS)")
+                )
+
+            # Check availability on linux platform as representative
+            representative_pixi_platform = platform_groups.get("linux", platform_groups.get("osx", platforms))[0]
+            platform_obj = Platform(representative_pixi_platform)
+            packages_to_check = list(unix_deps.keys())
+
+            availability = {}
+            if channels and packages_to_check:
+                typer.echo("Checking package availability for unix...")
+                availability = _check_package_availability(
+                    packages_to_check, channels, platform_obj
+                )
+
+            available_packages = []
+            unavailable_packages = []
+
+            for conda_dep in sorted(unix_deps.keys()):
+                if conda_dep not in target_deps:
+                    is_available = availability.get(conda_dep, True)
+                    if is_available:
+                        available_packages.append(conda_dep)
+                    else:
+                        unavailable_packages.append(conda_dep)
+
+            for conda_dep in available_packages:
+                version = dep_versions.get(conda_dep, "*")
+                target_deps[conda_dep] = version
+
+            if unavailable_packages:
+                target_deps.add(tomlkit.nl())
+                target_deps.add(
+                    tomlkit.comment("The following packages were not found:")
+                )
+                for conda_dep in unavailable_packages:
+                    version = dep_versions.get(conda_dep, "*")
+                    target_deps.add(
+                        tomlkit.comment(f'{conda_dep} = "{version}"  # NOT FOUND')
+                    )
+
+    # Now add remaining platform-specific dependencies (not in common, not in unix)
     if len(mapping_platform_list) > 1:
         for mapping_platform in mapping_platform_list:
             platform_specific_deps = {
                 dep: sources
                 for dep, sources in platform_deps[mapping_platform].items()
-                if dep not in common_deps
+                if dep not in common_deps and dep not in unix_deps
             }
 
             if platform_specific_deps:

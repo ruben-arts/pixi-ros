@@ -147,7 +147,8 @@ The command is idempotent - you can run it multiple times to update dependencies
 
 2. **Organizes dependencies intelligently**:
    - **Common dependencies** (available on all platforms) → `[dependencies]`
-   - **Platform-specific dependencies** → `[target.{platform}.dependencies]`
+   - **Unix dependencies** (available on Linux and macOS, but not Windows) → `[target.unix.dependencies]`
+   - **Platform-specific dependencies** → `[target.linux.dependencies]`, `[target.osx.dependencies]`, etc.
 
 3. **Sets up correct platform list**: The `[workspace]` section gets the appropriate pixi platform names
 
@@ -183,15 +184,15 @@ platforms = ["linux-64", "osx-arm64"]
 ros-humble-rclcpp = "*"
 ros-humble-std-msgs = "*"
 
+[target.unix.dependencies]
+# Unix-specific dependencies (Linux and macOS)
+xorg-libx11 = "*"
+xorg-libxext = "*"
+
 [target.linux.dependencies]
 # Linux-specific dependencies
 libgl-devel = "*"
 libopengl-devel = "*"
-
-[target.osx.dependencies]
-# macOS-specific dependencies
-xorg-libx11 = "*"
-xorg-libxext = "*"
 ```
 
 ### Interactive Platform Selection
