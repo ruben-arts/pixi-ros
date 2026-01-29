@@ -6,7 +6,9 @@ import tomlkit
 import typer
 from rattler import Channel, Gateway, Platform
 from rich.console import Console
+from rich.panel import Panel
 from rich.table import Table
+from rich.text import Text
 
 from pixi_ros.mappings import expand_gl_requirements, map_ros_to_conda, validate_distro
 from pixi_ros.utils import detect_cmake_version_requirement
@@ -95,24 +97,48 @@ def init_workspace(distro: str, workspace_path: Path | None = None) -> bool:
     try:
         with open(pixi_toml_path, "w") as f:
             tomlkit.dump(pixi_config, f)
+
+        # Create README_PIXI.md to help users
+        _create_readme(workspace_path, distro)
         typer.secho(
             f"✓ Successfully initialized {pixi_toml_path}", fg="green", bold=True
         )
 
-        # Display helpful next steps
+        # Inform about README
+        readme_path = workspace_path / "README_PIXI.md"
+        readme_created = readme_path.exists()
+
+        # Display helpful next steps with Rich
         typer.echo("")
-        typer.secho("Next steps:", fg="cyan", bold=True)
-        typer.echo("  1. Install dependencies:  ", nl=False)
-        typer.secho("pixi install", fg="yellow")
-        typer.echo("  2. Build workspace:       ", nl=False)
-        typer.secho("pixi run build", fg="yellow")
-        typer.echo("  3. Run tests:             ", nl=False)
-        typer.secho("pixi run test", fg="yellow")
-        typer.echo("")
-        typer.secho("Tip:", fg="blue", bold=True, nl=False)
-        typer.echo(" You can add more packages with:")
-        typer.echo("     ", nl=False)
-        typer.secho("pixi add <conda-package>", fg="yellow")
+
+        # Build the content for the panel
+        content = Text()
+
+        if readme_created:
+            content.append("📖 Created README_PIXI.md\n", style="green bold")
+            content.append("   Check it out for detailed usage instructions!\n\n", style="dim")
+
+        content.append("Next steps:\n", style="cyan bold")
+        content.append("  1. Install dependencies:  ", style="white")
+        content.append("pixi install\n", style="yellow bold")
+        content.append("  2. Build workspace:       ", style="white")
+        content.append("pixi run build\n", style="yellow bold")
+        content.append("  3. Run tests:             ", style="white")
+        content.append("pixi run test\n\n", style="yellow bold")
+
+        content.append("💡 Tip: ", style="blue bold")
+        content.append("Activate the workspace with ", style="white")
+        content.append("pixi shell", style="yellow bold")
+        content.append("\n   and then run ROS commands directly.", style="dim")
+
+        # Display in a nice panel
+        panel = Panel(
+            content,
+            title="[bold green]✓ Successfully Initialized[/bold green]",
+            border_style="green",
+            padding=(1, 2),
+        )
+        console.print(panel)
 
         return True
     except Exception as e:
@@ -366,6 +392,10 @@ def _ensure_dependencies(config: dict, packages, distro: str):
     # Add base ROS dependencies with comment
     base_deps = {
         f"ros-{distro}-ros-base": "*",
+        "pkg-config": "*",
+        "compilers": "*",
+        "make": "*",
+        "ninja": "*",
     }
 
     # Add newline and comment before base deps if dependencies table is empty
@@ -489,3 +519,28 @@ def _ensure_activation(config: dict):
     elif "scripts" not in config["activation"]:
         # Just add scripts if activation exists but scripts don't
         config["activation"]["scripts"] = ["install/setup.bash"]
+
+
+def _create_readme(workspace_path: Path, distro: str):
+    """Create README_PIXI.md to help users understand the pixi-ros workflow."""
+    readme_path = workspace_path / "README_PIXI.md"
+
+    # Don't overwrite existing README_PIXI.md
+    if readme_path.exists():
+        return
+
+    try:
+        # Load template from data directory
+        template_path = Path(__file__).parent / "data" / "README_PIXI.md.template"
+        with open(template_path) as f:
+            template_content = f.read()
+
+        # Format template with distro
+        readme_content = template_content.format(distro=distro)
+
+        # Write to workspace
+        with open(readme_path, "w") as f:
+            f.write(readme_content)
+    except Exception as e:
+        # Don't fail if we can't create the README
+        typer.echo(f"Warning: Could not create README_PIXI.md: {e}", err=True)

@@ -5,6 +5,7 @@ from typing import Annotated
 import typer
 
 from pixi_ros.init import init_workspace
+from pixi_ros.mappings import get_ros_distros
 
 app = typer.Typer(
     name="pixi-ros",
@@ -19,60 +20,46 @@ app.add_typer(pkg_app, name="pkg")
 @app.command()
 def init(
     distro: Annotated[
-        str,
-        typer.Argument(help="ROS distribution (e.g., humble, iron, jazzy)"),
-    ],
+        str | None,
+        typer.Option(
+            "--distro",
+            "-d",
+            help="ROS distribution (e.g., humble, iron, jazzy)",
+        ),
+    ] = None,
 ):
     """Initialize pixi.toml for a ROS workspace."""
+    # If distro not provided, prompt user to select one
+    if distro is None:
+        available_distros = get_ros_distros()
+        typer.echo("Available ROS distributions:")
+        for i, d in enumerate(available_distros, 1):
+            typer.echo(f"  {i}. {d}")
+
+        # Prompt for selection
+        selection = typer.prompt(
+            "\nSelect a distribution (enter number or name)",
+            type=str,
+        )
+
+        # Parse selection (either number or name)
+        try:
+            selection_num = int(selection)
+            if 1 <= selection_num <= len(available_distros):
+                distro = available_distros[selection_num - 1]
+            else:
+                typer.echo(f"Error: Invalid selection. Please choose 1-{len(available_distros)}", err=True)
+                raise typer.Exit(code=1)
+        except ValueError:
+            # User entered a name instead of number
+            if selection in available_distros:
+                distro = selection
+            else:
+                typer.echo(f"Error: '{selection}' is not a valid ROS distribution", err=True)
+                typer.echo(f"Available: {', '.join(available_distros)}", err=True)
+                raise typer.Exit(code=1)
+
     init_workspace(distro)
-
-
-@app.command()
-def add(
-    dependency: Annotated[str, typer.Argument(help="ROS package to add as dependency")],
-    build: Annotated[
-        bool, typer.Option("--build", help="Add as build dependency")
-    ] = False,
-    exec: Annotated[
-        bool, typer.Option("--exec", help="Add as exec dependency")
-    ] = False,
-    test: Annotated[
-        bool, typer.Option("--test", help="Add as test dependency")
-    ] = False,
-):
-    """Add a dependency to the current ROS package."""
-    dep_type = "exec"  # default
-    if build:
-        dep_type = "build"
-    elif test:
-        dep_type = "test"
-
-    typer.echo(f"Adding {dependency} as {dep_type} dependency")
-    # TODO: Implement in Stage 5
-    raise typer.Exit(code=1)
-
-
-@pkg_app.command()
-def create(
-    name: Annotated[str, typer.Argument(help="Name of the ROS package to create")],
-    python: Annotated[
-        bool, typer.Option("--python", help="Create Python package")
-    ] = False,
-    cpp: Annotated[bool, typer.Option("--cpp", help="Create C++ package")] = False,
-):
-    """Create a new ROS package."""
-    if not python and not cpp:
-        typer.echo("Error: Must specify either --python or --cpp", err=True)
-        raise typer.Exit(code=1)
-
-    if python and cpp:
-        typer.echo("Error: Cannot specify both --python and --cpp", err=True)
-        raise typer.Exit(code=1)
-
-    lang = "Python" if python else "C++"
-    typer.echo(f"Creating {lang} package: {name}")
-    # TODO: Implement in Stage 4
-    raise typer.Exit(code=1)
 
 
 def main():
