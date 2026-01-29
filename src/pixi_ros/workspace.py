@@ -2,7 +2,31 @@
 
 from pathlib import Path
 
+import pathspec
+
 from pixi_ros.package_xml import PackageXML
+
+
+def load_gitignore_spec(workspace_root: Path) -> pathspec.PathSpec | None:
+    """
+    Load gitignore patterns from workspace root.
+
+    Args:
+        workspace_root: Root directory of the workspace
+
+    Returns:
+        PathSpec object with gitignore patterns, or None if no .gitignore exists
+    """
+    gitignore_path = workspace_root / ".gitignore"
+    if not gitignore_path.exists():
+        return None
+
+    try:
+        with open(gitignore_path) as f:
+            patterns = f.read().splitlines()
+        return pathspec.PathSpec.from_lines("gitignore", patterns)
+    except (OSError, ValueError):
+        return None
 
 
 def find_package_xml(start_path: Path | None = None) -> Path | None:
@@ -36,10 +60,11 @@ def find_package_xml(start_path: Path | None = None) -> Path | None:
 
 def find_workspace_root(start_path: Path | None = None) -> Path | None:
     """
-    Find the workspace root by looking for a directory structure with package.xml files.
+    Find the workspace root by looking for a directory with ROS package.xml files.
 
-    A workspace root is typically identified by having a 'src' directory containing
-    package.xml files, or by being a directory that contains package.xml files.
+    Searches recursively for package.xml files, excluding hidden directories and
+    build artifacts. Returns the directory containing packages, or the parent of
+    a 'src' directory if packages are organized in that structure.
 
     Args:
         start_path: Starting directory for search (defaults to cwd)
@@ -51,11 +76,34 @@ def find_workspace_root(start_path: Path | None = None) -> Path | None:
         start_path = Path.cwd()
 
     current = start_path.resolve()
+    skip_dirs = {"build", "install", "log", ".pixi"}
+
+    # Helper to check if a directory has package.xml files
+    def has_packages(path: Path) -> bool:
+        """Check if path contains any package.xml files (recursively)."""
+        # Load gitignore patterns if available
+        gitignore_spec = load_gitignore_spec(path)
+
+        for package_xml in path.rglob("package.xml"):
+            # Get relative path from workspace root
+            relative_path = package_xml.relative_to(path)
+            relative_parts = relative_path.parts
+
+            # Skip if any parent is hidden or in skip list
+            if any(part.startswith(".") or part in skip_dirs for part in relative_parts):
+                continue
+
+            # Skip if matched by gitignore patterns
+            if gitignore_spec and gitignore_spec.match_file(str(relative_path)):
+                continue
+
+            return True
+        return False
 
     # First, check if we're inside a package - search upward for package.xml
     package_xml = find_package_xml(current)
     if package_xml:
-        # We found a package.xml, so go up one level to see if there's a src/ dir
+        # We found a package.xml, so determine the workspace root
         package_dir = package_xml.parent
         potential_src = package_dir.parent
 
@@ -64,25 +112,32 @@ def find_workspace_root(start_path: Path | None = None) -> Path | None:
             # The workspace root is the parent of 'src'
             return potential_src.parent
 
-        # Otherwise, check if current directory has a src/ folder with packages
-        if (current / "src").exists():
-            if any((current / "src").glob("*/package.xml")):
-                return current
+        # Otherwise, return the parent of the package directory
+        return package_dir.parent
 
-    # Search upward for a directory with 'src' containing package.xml files
+    # Check if current directory has any packages
+    if has_packages(current):
+        # If the directory is named 'src', return its parent as the workspace root
+        if current.name == "src":
+            return current.parent
+        return current
+
+    # Search upward for a directory containing packages
     while True:
-        src_dir = current / "src"
-        if src_dir.exists() and src_dir.is_dir():
-            # Check if src contains any package.xml files
-            if any(src_dir.glob("*/package.xml")) or any(src_dir.glob("package.xml")):
-                return current
+        if has_packages(current):
+            # If the directory is named 'src', return its parent as the workspace root
+            if current.name == "src":
+                return current.parent
+            return current
 
         parent = current.parent
         if parent == current:  # Reached root
             break
         current = parent
 
-    return None
+    # If no packages found anywhere, return the starting directory
+    # This allows initializing a new workspace in an empty directory
+    return start_path.resolve()
 
 
 def discover_packages(workspace_root: Path) -> list[PackageXML]:
@@ -110,15 +165,23 @@ def discover_packages(workspace_root: Path) -> list[PackageXML]:
     packages = []
 
     # Directories to skip during recursive search
-    skip_dirs = {"build", "install", "log", ".pixi"}
+    skip_dirs = {"build", "install", "log", ".pixi", "tests", "test"}
+
+    # Load gitignore patterns if available
+    gitignore_spec = load_gitignore_spec(workspace_root)
 
     # Recursively find all package.xml files
     for package_xml_path in workspace_root.rglob("package.xml"):
-        # Get relative path parts from workspace root
-        relative_parts = package_xml_path.relative_to(workspace_root).parts
+        # Get relative path from workspace root
+        relative_path = package_xml_path.relative_to(workspace_root)
+        relative_parts = relative_path.parts
 
         # Skip if any parent directory is hidden (starts with .) or in skip list
         if any(part.startswith(".") or part in skip_dirs for part in relative_parts):
+            continue
+
+        # Skip if matched by gitignore patterns
+        if gitignore_spec and gitignore_spec.match_file(str(relative_path)):
             continue
 
         try:

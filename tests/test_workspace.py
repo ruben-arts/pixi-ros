@@ -147,3 +147,36 @@ def test_discover_packages_empty_workspace():
 
         packages = discover_packages(tmppath)
         assert len(packages) == 0
+
+
+def test_discover_packages_respects_gitignore():
+    """Test that package discovery respects .gitignore patterns."""
+    with TemporaryDirectory() as tmpdir:
+        tmppath = Path(tmpdir)
+
+        # Create a gitignore that excludes ignored_pkg
+        gitignore = tmppath / ".gitignore"
+        gitignore.write_text("ignored_pkg/\n")
+
+        # Create two packages - one that should be ignored, one that shouldn't
+        for pkg_name in ["valid_pkg", "ignored_pkg"]:
+            pkg_dir = tmppath / pkg_name
+            pkg_dir.mkdir()
+            pkg_xml = pkg_dir / "package.xml"
+            pkg_xml.write_text(
+                f"""<?xml version="1.0"?>
+            <package format="3">
+                <name>{pkg_name}</name>
+                <version>0.1.0</version>
+                <description>Test</description>
+                <maintainer email="test@test.com">Test</maintainer>
+                <license>MIT</license>
+            </package>
+            """
+            )
+
+        packages = discover_packages(tmppath)
+
+        # Should only find valid_pkg, not ignored_pkg
+        assert len(packages) == 1
+        assert packages[0].name == "valid_pkg"

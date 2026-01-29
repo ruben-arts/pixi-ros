@@ -15,14 +15,15 @@ dependencies = [
     "lxml>=5.0.0",
     "pyyaml>=6.0",
     "py-rattler>=0.6.0",
+    "pathspec>=0.11.0",
 ]
 
 [project.scripts]
 pixi-ros = "pixi_ros.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/prefix-dev/pixi-ros"
-Repository = "https://github.com/prefix-dev/pixi-ros"
+Homepage = "https://github.com/ruben-arts/pixi-ros"
+Repository = "https://github.com/ruben-arts/pixi-ros"
 
 [dependency-groups]
 test = ["pytest>=8.0.0", "ruff>=0.6.0"]
