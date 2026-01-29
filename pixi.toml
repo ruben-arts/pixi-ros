@@ -1,0 +1,22 @@
+[workspace]
+channels = ["conda-forge"]
+platforms = ["osx-arm64", "linux-64", "osx-64", "win-64"]
+preview = ["pixi-build"]
+
+[dependencies]
+pytest = ">=8.0.0"
+ruff = ">=0.6.0"
+pixi-ros = { path = "." }
+
+[tasks]
+test = "pytest tests/ -v"
+lint = "ruff check src/"
+format = "ruff format src/"
+
+[package.build.backend]
+name = "pixi-build-python"
+version = ">=0.4"
+
+[package.build.config]
+noarch = true
+ignore-pypi-mapping = false  # Enable automatic PyPI-to-conda mapping

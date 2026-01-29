@@ -1,0 +1,40 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>my_mixed_pkg</name>
+  <version>2.0.0</version>
+  <description>A package with various dependency types including workspace deps</description>
+  <maintainer email="mixed@example.com">Mixed Developer</maintainer>
+  <license>BSD</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <buildtool_depend>rosidl_default_generators</buildtool_depend>
+
+  <!-- Build-only dependencies -->
+  <build_depend>rclcpp</build_depend>
+  <build_depend>rclpy</build_depend>
+
+  <!-- Runtime dependencies -->
+  <exec_depend>rclcpp</exec_depend>
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>nav_msgs</exec_depend>
+  <exec_depend>tf2_ros</exec_depend>
+
+  <!-- Build and export dependencies (for libraries) -->
+  <build_export_depend>geometry_msgs</build_export_depend>
+  <build_export_depend>std_msgs</build_export_depend>
+
+  <!-- Dependencies on other packages in this workspace -->
+  <depend>my_cpp_pkg</depend>
+  <exec_depend>my_python_pkg</exec_depend>
+
+  <!-- Test dependencies -->
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+  <test_depend>ament_cmake_pytest</test_depend>
+  <test_depend>launch_testing</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

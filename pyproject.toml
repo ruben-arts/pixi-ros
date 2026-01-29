@@ -1,0 +1,60 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "pixi-ros"
+version = "0.1.0"
+description = "Pixi extension for ROS package management"
+authors = []
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "typer>=0.12.0",
+    "tomlkit>=0.12.0",
+    "lxml>=5.0.0",
+    "pyyaml>=6.0",
+    "py-rattler>=0.6.0",
+]
+
+[project.scripts]
+pixi-ros = "pixi_ros.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/prefix-dev/pixi-ros"
+Repository = "https://github.com/prefix-dev/pixi-ros"
+
+[dependency-groups]
+test = ["pytest>=8.0.0", "ruff>=0.6.0"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py310"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+]
+ignore = []
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.hatchling.build.targets.wheel]
+packages = ["src/pixi_ros"]
+
+[tool.hatchling.build.targets.wheel.force-include]
+"src/pixi_ros/data" = "pixi_ros/data"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+norecursedirs = ["tests/examples"]

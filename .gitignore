@@ -1,0 +1,13 @@
+# pixi environments
+.pixi/*
+!.pixi/config.toml
+
+# Python
+__pycache__/
+
+# ROS
+build/
+devel/
+install/
+log/
+resource/

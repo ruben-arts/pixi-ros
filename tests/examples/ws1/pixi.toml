@@ -1,0 +1,39 @@
+[workspace]
+name = "ws1"
+channels = ["https://prefix.dev/robostack-jazzy", "https://prefix.dev/conda-forge"]
+platforms = ["osx-arm64"]
+
+[dependencies]
+# Base ROS dependencies
+ros-jazzy-ros-base = "*"
+ros-jazzy-ros2cli = "*"
+
+# Build tools
+colcon-common-extensions = "*"
+cmake = "<4"
+
+# From package: package-a
+ros-jazzy-ament-cmake = "*"
+ros-jazzy-ament-lint-auto = "*"
+ros-jazzy-ament-lint-common = "*"
+
+# From package: package-b
+numpy = "*"
+pytest = "*"
+ros-jazzy-ament-copyright = "*"
+ros-jazzy-ament-flake8 = "*"
+ros-jazzy-ament-pep257 = "*"
+
+[tasks]
+build = "colcon build"
+test = "colcon test"
+clean = "rm -rf build install log"
+
+[tool.pytest.ini_options]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+
+# Scripts to source on environment activation, found after first colcon build.
+
+[activation]
+scripts = ["install/setup.bash"]

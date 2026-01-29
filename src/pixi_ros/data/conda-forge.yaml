@@ -1,0 +1,1049 @@
+# This file is part of the pixi noetic project. for testing purposes.
+acl:
+  pixi:
+    linux: [libacl]
+    osx: []
+    win64: []
+alsa-oss:
+  pixi: [alsa-lib]
+apr:
+  pixi: [apr]
+armadillo:
+  pixi: [armadillo]
+asio:
+  pixi: [asio]
+assimp:
+  pixi: [assimp]
+assimp-dev:
+  pixi: [assimp]
+avahi-daemon:
+  pixi: [python-avahi]
+benchmark:
+  pixi: [benchmark]
+binutils:
+  pixi:
+    linux: [binutils]
+    osx: []
+    win64: []
+bison:
+  pixi: [bison]
+boost:
+  pixi: [libboost-devel, libboost-python-devel]
+bullet:
+  pixi: [bullet]
+bzip2:
+  pixi: [bzip2]
+cartographer:
+  pixi: [cartographer]
+ca-certificates:
+  pixi: [ca-certificates]
+clang-format:
+  pixi: [clang-format]
+clang-tidy:
+  pixi: [clang-tools]
+cmake:
+  pixi: [cmake]
+coinor-libcbc-dev:
+  pixi: [coin-or-cbc]
+coinor-libcgl-dev:
+  pixi: [coin-or-cgl]
+coinor-libclp-dev:
+  pixi: [coin-or-clp]
+coinor-libcoinutils-dev:
+  pixi: [coin-or-utils]
+coinor-libipopt-dev:
+  pixi: [ipopt]
+collada-dom:
+  pixi: [collada-dom]
+cppcheck:
+  pixi: [cppcheck]
+cppunit:
+  pixi:
+    linux: [cppunit]
+    osx: [cppunit]
+    win64: []
+cppzmq:
+  pixi: [cppzmq]
+curl:
+  pixi: [libcurl]
+cython:
+  pixi: [cython]
+doxygen:
+  pixi: [doxygen, graphviz]
+draco:
+  pixi: [draco]
+eigen:
+  pixi: [eigen]
+emacs:
+  # Wait until https://github.com/pixi-forge/gtk3-feedstock/pull/74 is resolved
+  # and emacs is rebuilt for harfbuzz=10
+  #   pixi: [emacs]
+  pixi: []
+festival:
+  pixi:
+    linux: [festival, festvox-kallpc16k]
+    osx: []
+    win64: []
+# This is not available on Windows, and it is only
+# required by libcurl_vendor (see https://index.ros.org/d/file/)
+# but it is not actually used if libcurl is not compiled,
+# so we can just ignore it on Windows.
+file:
+  pixi:
+    linux: [file]
+    osx: [file]
+    win64: []
+ffmpeg:
+  pixi: [ffmpeg]
+ffmpeg-dev:
+  pixi: [ffmpeg]
+flac:
+  pixi: [libflac]
+flex:
+  pixi: [flex]
+fmt:
+  pixi: [fmt]
+g++-static:
+  pixi: []
+gawk:
+  pixi: [gawk]
+gazebo:
+  pixi: [gazebo, libprotobuf, libabseil]
+gazebo11:
+  pixi: [gazebo, libprotobuf, libabseil]
+gazebo9:
+  pixi: [gazebo, libprotobuf, libabseil]
+geographiclib:
+  pixi: [geographiclib-cpp]
+geographiclib-tools:
+  pixi: [geographiclib-cpp]
+git:
+  pixi: [git]
+glslang-dev:
+  pixi: [glslang]
+glut:
+  pixi:
+    linux: [freeglut]
+    osx: []
+    win64: [freeglut]
+google-mock:
+  pixi: [gmock]
+graphicsmagick:
+  pixi: [graphicsmagick]
+graphviz:
+  pixi: [graphviz]
+gstreamer1.0:
+  pixi: [gstreamer]
+gstreamer1.0-alsa:
+  pixi: [gstreamer]
+gstreamer1.0-plugins-base:
+  pixi: [gst-plugins-base]
+gstreamer1.0-plugins-good:
+  pixi: [gst-plugins-good]
+# only sound-play requests it, but doesn't actually need it
+# do not pull it in as migrations lack behind
+gstreamer1.0-plugins-ugly:
+  pixi: []
+gtest:
+  pixi: [gtest]
+gtk2:
+  pixi: [gtk2]
+gtk3:
+  pixi: [
+    libglib,
+    glib,
+    gtk3,
+    harfbuzz,
+    libxcb,
+    pthread-stubs,
+    xorg-libxau,
+    xorg-libxi,
+    xorg-libxrandr,
+    xorg-libxcursor,
+    xorg-libxtst,
+    xorg-libxcomposite,
+    xorg-libxdamage,
+    xorg-libxinerama,
+    xorg-xineramaproto,
+    epoxy,
+    REQUIRE_GL,
+  ]
+ignition-common4:
+  pixi: [libignition-common4]
+ignition-cmake2:
+  pixi: [libignition-cmake2]
+ignition-gazebo3:
+  pixi: [libignition-gazebo6]
+ignition-gazebo5:
+  pixi: [libignition-gazebo6]
+ignition-gazebo6:
+  pixi: [libignition-gazebo6]
+ignition-gui5:
+  pixi: [libignition-gui6]
+ignition-math6:
+  pixi: [libignition-math6]
+ignition-msgs5:
+  pixi: [libignition-msgs8]
+ignition-msgs8:
+  pixi: [libignition-msgs8]
+ignition-msgs7:
+  pixi: [libignition-msgs8]
+ignition-rendering5:
+  pixi: [libignition-rendering6]
+ignition-transport8:
+  pixi: [libignition-transport11]
+ignition-transport10:
+  pixi: [libignition-transport11]
+ignition-transport11:
+  pixi: [libignition-transport11]
+java:
+  pixi: [openjdk]
+jupyter-notebook:
+  pixi: [notebook]
+ipython3:
+  pixi: [ipython]
+kitchen:
+  pixi: [kitchen]
+lcov:
+  pixi: [lcov]
+leveldb:
+  pixi: [leveldb]
+libabsl-dev:
+  pixi: [libabseil]
+libblas-dev:
+  pixi: [libblas, libcblas]
+libboost:
+  pixi: [libboost]
+libboost-chrono-dev:
+  pixi: [libboost-devel]
+libboost-date-time:
+  pixi: [libboost]
+libboost-date-time-dev:
+  pixi: [libboost-devel]
+libboost-dev:
+  pixi: [libboost-devel]
+libboost-filesystem:
+  pixi: [libboost]
+libboost-filesystem-dev:
+  pixi: [libboost-devel]
+libboost-iostreams-dev:
+  pixi: [libboost-devel]
+libboost-program-options:
+  pixi: [libboost]
+libboost-program-options-dev:
+  pixi: [libboost-devel]
+libboost-python:
+  pixi: [libboost-python]
+libboost-python-dev:
+  pixi: [libboost-python-devel]
+libboost-random:
+  pixi: [libboost]
+libboost-random-dev:
+  pixi: [libboost-devel]
+libboost-regex-dev:
+  pixi: [libboost-devel]
+libboost-serialization:
+  pixi: [libboost]
+libboost-serialization-dev:
+  pixi: [libboost-devel]
+libboost-system:
+  pixi: [libboost]
+libboost-system-dev:
+  pixi: [libboost-devel]
+libboost-thread:
+  pixi: [libboost]
+libboost-thread-dev:
+  pixi: [libboost-devel]
+libcairo2-dev:
+  pixi: [cairo]
+libcap-dev:
+  pixi:
+    linux: [libcap]
+    osx: []
+    win64: []
+libccd-dev:
+  pixi: [libccd-double]
+libceres-dev:
+  pixi: [ceres-solver]
+libclang-dev:
+  pixi: [libclang]
+libconsole-bridge-dev:
+  pixi: [console_bridge]
+libcunit-dev:
+  pixi: [cunit]
+libcurl:
+  pixi: [libcurl]
+libcurl-dev:
+  pixi: [libcurl]
+libdc1394-dev:
+  pixi: [libdc1394]
+libdw-dev:
+  pixi:
+    linux: [elfutils]
+    osx: []
+    win64: []
+libfcl-dev:
+  pixi: [fcl]
+libffi-dev:
+  pixi: [libffi]
+libflann-dev:
+  pixi: [flann]
+libfltk-dev:
+  pixi: [fltk]
+libfreeimage-dev:
+  pixi: [freeimage]
+libfreenect-dev:
+  pixi: []
+libfreetype-dev:
+  pixi: [freetype]
+libfreetype6:
+  pixi: [freetype]
+libfreetype6-dev:
+  pixi: [freetype]
+libftdi-dev:
+  pixi: [libftdi, libusb]
+libgazebo11-dev:
+  pixi: [gazebo, libprotobuf, libabseil]
+libgazebo9-dev:
+  pixi: [gazebo, libprotobuf, libabseil]
+libgdal-dev:
+  pixi: [libgdal]
+libgeos++-dev:
+  pixi: [geos]
+libgflags-dev:
+  pixi: [gflags]
+libglew-dev:
+  pixi: [glew]
+libglfw3-dev:
+  pixi: [glfw 3.*]
+libglu-dev:
+  pixi:
+    linux: [libglu]
+    osx: []
+    win64: []
+libgoogle-glog-dev:
+  pixi: [glog]
+libgpgme-dev:
+  pixi:
+    linux: [gpgme]
+    osx: [gpgme]
+    win64: []
+libgps:
+  pixi: [gpsd]
+libgsl:
+  pixi: [gsl]
+libgstreamer-plugins-base1.0-dev:
+  pixi: [gst-plugins-base]
+libgstreamer1.0-dev:
+  pixi: [gstreamer]
+libgts:
+  pixi: [gts]
+libhdf5-dev:
+  pixi: [hdf5]
+libi2c-dev:
+  pixi: [libi2c]
+liblttng-ust-dev:
+  pixi: ["${{ \"lttng-ust\" if linux }}"]
+libjpeg:
+  pixi: [libjpeg-turbo]
+libjsoncpp:
+  pixi: [jsoncpp]
+libjsoncpp-dev:
+  pixi: [jsoncpp]
+liblapack-dev:
+  pixi: [liblapack]
+liblz4:
+  pixi: [lz4]
+liblz4-dev:
+  pixi: [lz4]
+libmicrohttpd:
+  pixi: [libmicrohttpd]
+libnanoflann-dev:
+  pixi: [nanoflann]
+libncurses-dev:
+  pixi:
+    linux: [ncurses]
+    osx: [ncurses]
+    win64: []
+libnl-3:
+  pixi: [libnl 3.*]
+libnl-3-dev:
+  pixi: [libnl 3.*]
+libnlopt-cxx-dev:
+  pixi: [nlopt]
+libnlopt-dev:
+  pixi: [nlopt]
+libnlopt0:
+  pixi: [nlopt]
+libogg:
+  pixi: [libogg]
+libogre:
+  pixi: [ogre]
+libogre-dev:
+  pixi: [ogre]
+libomp-dev:
+  pixi:
+    linux: [libgomp]
+    osx: [llvm-openmp]
+    win64: []
+libopenblas-dev:
+  pixi: [libblas]
+libopencv-dev:
+  pixi: [py-opencv, libopencv, REQUIRE_OPENGL]
+libopencv-imgproc-dev:
+  pixi: [py-opencv, libopencv, REQUIRE_OPENGL]
+libopenni-dev:
+  pixi: []
+liborocos-kdl:
+  pixi: [orocos-kdl]
+liborocos-kdl-dev:
+  pixi: [orocos-kdl]
+libpcap:
+  pixi: [libpcap]
+libpcl-all:
+  pixi: [pcl]
+libpcl-all-dev:
+  pixi: [pcl, libboost-devel, vtk-base, REQUIRE_OPENGL]
+libpcl-common:
+  pixi: [pcl]
+libpcl-filters:
+  pixi: [pcl]
+libpcl-io:
+  pixi: [pcl]
+libpng-dev:
+  pixi: [libpng]
+libpoco-dev:
+  pixi: [poco]
+libpqxx:
+  pixi: [libpqxx]
+libpqxx-dev:
+  pixi: [libpqxx]
+libqglviewer2-qt5:
+  pixi: [libqglviewer]
+libqglviewer-dev-qt5:
+  pixi: [libqglviewer]
+libqhull:
+  pixi: [qhull]
+libqt5-core:
+  pixi: [qt-main, REQUIRE_OPENGL]
+libqt5-gui:
+  pixi: [qt-main, REQUIRE_OPENGL]
+libqt5-opengl:
+  pixi: [qt-main, REQUIRE_OPENGL]
+libqt5-opengl-dev:
+  pixi: [qt-main, REQUIRE_OPENGL]
+libqt5-svg:
+  pixi: [qt-main, REQUIRE_OPENGL]
+libqt5-svg-dev:
+  pixi: [qt-main, REQUIRE_OPENGL]
+libqt5-websockets-dev:
+  pixi: [qt-main, REQUIRE_OPENGL]
+libqt5-widgets:
+  pixi: [qt-main, REQUIRE_OPENGL]
+libqt5x11extras5-dev:
+  pixi: [qt-main, REQUIRE_OPENGL]
+libreadline:
+  pixi: [readline]
+libreadline-dev:
+  pixi: [readline]
+libshaderc-dev:
+  pixi: [shaderc]
+libsndfile1-dev:
+  pixi: [libsndfile]
+libspnav-dev:
+  pixi: [libspnav, xorg-xorgproto]
+libsqlite3-dev:
+  pixi: [sqlite 3.*]
+libssl-dev:
+  pixi: [openssl]
+libtheora:
+  pixi: [libtheora]
+libtool:
+  pixi: [libtool]
+libturbojpeg:
+  pixi: [libjpeg-turbo]
+libtins-dev:
+  pixi: [libtins]
+libudev-dev:
+  pixi:
+    linux: [libusb, libudev]
+    osx: [libusb]
+    win64: [libusb]
+liburdfdom-dev:
+  pixi: [urdfdom]
+liburdfdom-headers-dev:
+  pixi: [urdfdom_headers]
+liburdfdom-tools:
+  pixi: [urdfdom]
+libusb-1.0:
+  pixi:
+    linux: [libusb, libudev]
+    osx: [libusb]
+    win64: [libusb]
+libusb-1.0-dev:
+  pixi:
+    linux: [libusb, libudev]
+    osx: [libusb]
+    win64: [libusb]
+libusb-dev:
+  pixi:
+    linux: [libusb, libudev]
+    osx: [libusb]
+    win64: [libusb]
+libuvc-dev:
+  pixi:
+    linux: [libusb, libudev, libuvc]
+    osx: [libusb, libuvc]
+    win64: [libusb, libuvc]
+libvtk:
+  pixi: [vtk]
+libvtk-qt:
+  pixi: [vtk]
+libvulkan-dev:
+  pixi:
+    linux: [libvulkan-headers, libvulkan-loader]
+    osx: []
+    win64: [libvulkan-headers, libvulkan-loader]
+libx11:
+  pixi: [xorg-libx11, xorg-xorgproto, REQUIRE_OPENGL]
+libx11-dev:
+  pixi: [xorg-libx11, xorg-xorgproto, REQUIRE_OPENGL]
+libxaw:
+  pixi:
+    linux: [xorg-libxaw]
+    osx: [xorg-libxaw]
+    win64: []
+libxext:
+  pixi: [xorg-libxext]
+libxi-dev:
+  pixi: [xorg-libxi]
+libxml2:
+  pixi: [libxml2]
+libxml2-utils:
+  pixi: [libxml2]
+libxmlrpc-c++:
+  pixi: [xmlrpc-c]
+libxmu-dev:
+  pixi: [xorg-libxmu]
+libxrandr:
+  pixi:
+    linux: [xorg-libxrandr]
+    osx: [xorg-libxrandr]
+    win64: []
+libxt-dev:
+  pixi: [xorg-libxt]
+libxxf86vm:
+  pixi: [REQUIRE_OPENGL]
+libyaml:
+  pixi: [yaml]
+libyaml-dev:
+  pixi: [yaml]
+libzip-dev:
+  pixi: [libzip]
+libzmq3-dev:
+  pixi: [zeromq, cppzmq]
+libzstd-dev:
+  pixi: [zstd]
+linux-kernel-headers:
+  pixi: []
+log4cxx:
+  pixi: [log4cxx]
+lua5.2-dev:
+  pixi: [lua]
+lua-dev:
+  pixi: [lua]
+lz4:
+  pixi: [lz4]
+maven:
+  pixi: [maven]
+mongodb:
+  pixi: [mongodb]
+mosquitto:
+  pixi: [paho-mqtt]
+msgpack:
+  pixi: [msgpack-python]
+muparser:
+  pixi: [muparser]
+netpbm:
+  pixi:
+    linux-aarch64: []
+    osx-arm64: []
+    linux: [netpbm]
+    osx: [netpbm]
+    win64: []
+nlohmann-json-dev:
+  pixi: [nlohmann_json]
+nlopt:
+  pixi: [nlopt]
+ocl-icd-opencl-dev:
+  pixi: [ocl-icd]
+opengl:
+  pixi:
+    linux: [REQUIRE_OPENGL]
+    osx: [REQUIRE_OPENGL]
+    win64: []
+openssl:
+  pixi: [openssl]
+pcre:
+  pixi: [pcre]
+pkg-config:
+  pixi: [pkg-config]
+portaudio19-dev:
+  pixi: [portaudio]
+postgresql:
+  pixi: [postgresql]
+proj:
+  pixi: [proj]
+protobuf:
+  pixi: [libprotobuf, protobuf]
+protobuf-dev:
+  pixi: [libprotobuf, protobuf]
+pugixml-dev:
+  pixi: [pugixml]
+pybind11-dev:
+  pixi: [pybind11]
+pycodestyle:
+  pixi: [pycodestyle]
+pydocstyle:
+  pixi: [pydocstyle]
+pydrive-pip:
+  pixi: [pydrive]
+pyflakes3:
+  pixi: [pyflakes]
+python:
+  pixi: [python]
+python-argparse:
+  pixi: []
+python-autobahn:
+  pixi: [autobahn]
+python-bson:
+  pixi: [pymongo]
+python-cairo:
+  pixi: [pycairo]
+python-catkin-pkg:
+  pixi: [catkin_pkg]
+python-catkin-pkg-modules:
+  pixi: [catkin_pkg]
+python-chainer-pip:
+  pixi: [chainer]
+python-coverage:
+  pixi: [coverage]
+python-crypto:
+  pixi: [pycrypto]
+python-defusedxml:
+  pixi: [defusedxml]
+python-dev:
+  pixi: [python]
+python-dlib:
+  pixi: [dlib]
+python-empy:
+  pixi: [empy]
+python-enum34:
+  pixi: [enum34]
+python-freezegun-pip:
+  pixi: [freezegun]
+python-gdown-pip:
+  pixi: [gdown]
+python-gnupg:
+  pixi: [python-gnupg]
+python-imaging:
+  pixi: [pillow]
+python-inject-pip:
+  pixi: [inject]
+python-lxml:
+  pixi: [lxml]
+python-matplotlib:
+  pixi: [matplotlib-base]
+python-mock:
+  pixi: [mock]
+python-netifaces:
+  pixi: [netifaces]
+python-nose:
+  pixi: [nose]
+python-numpy:
+  pixi: [numpy]
+python-opencv:
+  pixi: [py-opencv, libopencv]
+python-opengl:
+  pixi: [pyopengl, REQUIRE_OPENGL]
+python-paramiko:
+  pixi: [paramiko]
+python-psutil:
+  pixi: [psutil]
+python-pyassimp:
+  pixi: [pyassimp]
+python-pycryptodome:
+  pixi: [pycryptodome, pycryptodomex]
+python-pydot:
+  pixi: [pydot]
+python-pygithub3:
+  pixi: [pygithub]
+python-pygraphviz:
+  pixi: [pygraphviz]
+python-pyusb-pip:
+  pixi: [pyusb]
+python-qt5-bindings:
+  pixi: [pyqt, pyqt-builder]
+python-rosdep:
+  pixi: [rosdep]
+python-rosdep-modules:
+  pixi: [rosdep]
+python-rospkg:
+  pixi: [rospkg]
+python-rospkg-modules:
+  pixi: [rospkg]
+python-setuptools:
+  pixi: [setuptools]
+python-sip:
+  pixi: [sip 6.7.*]
+python-six:
+  pixi: [six]
+python-slacker-cli:
+  pixi: [slacker]
+python-speechrecognition-pip:
+  pixi: [speechrecognition]
+python-tabulate-pip:
+  pixi: [tabulate]
+python-tk:
+  pixi: [tk]
+python-tornado:
+  pixi: [tornado]
+python-twisted-core:
+  pixi: [twisted]
+python-wxtools:
+  pixi: [wxpython]
+python-yaml:
+  pixi: [pyyaml]
+python3:
+  pixi: [python]
+python3-argcomplete:
+  pixi: [argcomplete]
+python3-autobahn:
+  pixi: [autobahn]
+python3-bson:
+  pixi: [pymongo]
+python3-cairo:
+  pixi: [pycairo]
+python3-catkin-pkg:
+  pixi: [catkin_pkg]
+python3-catkin-pkg-modules:
+  pixi: [catkin_pkg]
+python3-catkin-tools:
+  pixi: [catkin_tools]
+python3-cherrypy3:
+  pixi: [cherrypy]
+python3-click:
+  pixi: [click]
+python3-collada:
+  pixi: [pycollada]
+python3-colorama:
+  pixi: [colorama]
+python3-coverage:
+  pixi: [coverage]
+python3-cryptography:
+  pixi: [cryptography]
+python3-defusedxml:
+  pixi: [defusedxml]
+python3-deprecated:
+  pixi: [deprecated]
+python3-dev:
+  pixi: [python]
+python3-docopt:
+  pixi: [docopt]
+python3-docutils:
+  pixi: [docutils]
+python3-empy:
+  pixi: [empy]
+python3-flake8:
+  pixi: [flake8]
+python3-flake8-comprehensions:
+  pixi: [flake8-comprehensions]
+python3-flask:
+  pixi: [flask]
+python3-flask-cors:
+  pixi: [flask-cors]
+python3-fiona:
+  pixi: [fiona]
+python3-future:
+  pixi: [future]
+python3-gi:
+  pixi: [pygobject]
+python3-git:
+  pixi: [gitpython]
+python3-github:
+  pixi: [pygithub]
+python3-github3:
+  pixi: [pygithub]
+python3-gnupg:
+  pixi: [python-gnupg]
+python3-grpc-tools:
+  pixi: [grpcio-tools]
+python3-grpcio:
+  pixi: [grpcio]
+python3-h5py:
+  pixi: [h5py]
+python3-ifcfg:
+  pixi: [ifcfg]
+python3-imageio:
+  pixi: [imageio]
+python3-importlib-metadata:
+  pixi: [importlib-metadata]
+python3-importlib-resources:
+  pixi: [importlib_resources]
+python3-jinja2:
+  pixi: [jinja2]
+python3-kitchen:
+  pixi: [kitchen]
+python3-lark-parser:
+  pixi: [lark-parser]
+python3-lxml:
+  pixi: [lxml]
+python3-matplotlib:
+  pixi: [matplotlib-base]
+python3-mechanize:
+  pixi: [mechanize]
+python3-mock:
+  pixi: [mock]
+python3-msgpack:
+  pixi: [msgpack-python]
+python3-mypy:
+  pixi: [mypy]
+python3-netifaces:
+  pixi: [netifaces]
+python3-nose:
+  pixi: [nose]
+python3-numpy:
+  pixi: [numpy]
+python3-opencv:
+  pixi: [py-opencv, libopencv]
+python3-opengl:
+  pixi: [pyopengl, REQUIRE_OPENGL]
+python3-packaging:
+  pixi: [packaging]
+python3-pandas:
+  pixi: [pandas]
+python3-paramiko:
+  pixi: [paramiko]
+python3-pep8:
+  pixi: [pep8]
+python3-pil:
+  pixi: [pillow]
+python3-pip:
+  pixi: [pip]
+python3-pkg-resources:
+  pixi: []
+python3-protobuf:
+  pixi: [protobuf]
+python3-psutil:
+  pixi: [psutil]
+python3-pyassimp:
+  pixi: [pyassimp]
+python3-pycodestyle:
+  pixi: [pycodestyle]
+python3-pycryptodome:
+  pixi: [pycryptodome, pycryptodomex]
+python3-pydot:
+  pixi: [pydot]
+python3-pygraphviz:
+  pixi: [pygraphviz]
+python3-pykdl:
+  pixi: [python-orocos-kdl]
+python3-pymongo:
+  pixi: [pymongo]
+python3-pyproj:
+  pixi: [pyproj]
+python3-pysnmp:
+  pixi: [pysnmp]
+python3-pytest:
+  pixi: [pytest]
+python3-pytest-cov:
+  pixi: [pytest-cov]
+python3-pytest-mock:
+  pixi: [pytest-mock]
+python3-pytest-timeout:
+  pixi: [pytest-timeout]
+python3-qt5-bindings:
+  pixi: [pyqt, pyqt-builder]
+python3-qt5-bindings-gl:
+  pixi: [pyqt, pyqt-builder]
+python3-qt5-bindings-webkit:
+  pixi: [pyqtwebengine]
+python3-requests:
+  pixi: [requests]
+python3-requests-oauthlib:
+  pixi: [requests-oauthlib]
+python3-rtree:
+  pixi: [rtree]
+python3-rosdep:
+  pixi: [rosdep]
+python3-rosdep-modules:
+  pixi: [rosdep]
+python3-rosdistro-modules:
+  pixi: [rosdistro]
+python3-rospkg:
+  pixi: [rospkg]
+python3-rospkg-modules:
+  pixi: [rospkg]
+python3-ruamel.yaml:
+  pixi: [ruamel.yaml]
+python3-ruff:
+  pixi: [ruff]
+python3-scipy:
+  pixi: [scipy]
+python3-serial:
+  pixi: [pyserial]
+python3-setuptools:
+  pixi: [setuptools]
+python3-simplejson:
+  pixi: [simplejson]
+python3-six:
+  pixi: [six]
+python3-shapely:
+  pixi: [shapely]
+python3-skimage:
+  pixi: [scikit-image]
+python3-sklearn:
+  pixi: [scikit-learn]
+python3-sphinx:
+  pixi: [sphinx]
+python3-termcolor:
+  pixi: [termcolor]
+python3-texttable:
+  pixi: [texttable]
+python3-tk:
+  pixi: [tk]
+python3-tornado:
+  pixi: [tornado]
+python3-transforms3d:
+  pixi: [transforms3d]
+python3-twisted:
+  pixi: [twisted]
+python3-typeguard:
+  pixi: [typeguard]
+python3-types-pyyaml:
+  pixi: [types-pyyaml]
+python3-unidiff:
+  pixi: [unidiff]
+python3-usb:
+  pixi: [pyusb]
+python3-vcstool:
+  pixi: [vcstool]
+python3-flake8-docstrings:
+  pixi: [flake8-docstrings]
+python3-flake8-import-order:
+  pixi: [flake8-import-order]
+python3-flake8-builtins:
+  pixi: [flake8-builtins]
+python3-flake8-quotes:
+  pixi: [flake8-quotes]
+python3-venv:
+  pixi: [virtualenv, pip, pip-tools, setuptools]
+python3-websocket:
+  pixi: [websocket-client]
+python3-yaml:
+  pixi: [pyyaml]
+python3-zmq:
+  pixi: [pyzmq]
+qt5-image-formats-plugins:
+  pixi: [qt-main, REQUIRE_OPENGL]
+qt5-qmake:
+  pixi: [qt-main, REQUIRE_OPENGL]
+qtbase5-dev:
+  pixi: [qt-main, REQUIRE_OPENGL]
+rapidjson-dev:
+  pixi: [rapidjson]
+roboticstoolbox-python:
+  pixi: [roboticstoolbox-python]
+rsync:
+  pixi: [rsync]
+rti-connext-dds-5.3.1:
+  pixi: []
+ruby:
+  pixi: [ruby]
+sbcl:
+  pixi:
+    linux: [sbcl]
+    osx: [sbcl]
+    win64: []
+screen:
+  pixi: [screen]
+sdformat:
+  pixi: [libsdformat]
+sdformat12:
+  pixi: [libsdformat12]
+sdl:
+  pixi: [sdl]
+sdl-image:
+  pixi: [sdl_image]
+sdl2:
+  pixi: [sdl2]
+socat:
+  pixi: [socat]
+spacenavd:
+  pixi: [libspnav]
+spdlog:
+  pixi: [spdlog]
+sshpass:
+  pixi: [sshpass]
+subversion:
+  pixi: [subversion]
+suitesparse:
+  pixi: [suitesparse]
+sqlite3:
+  pixi: [sqlite 3.*]
+swig:
+  pixi: [swig]
+sysstat:
+  pixi: [sysstat]
+tango-icon-theme:
+  pixi: []
+tbb:
+  pixi: [tbb, tbb-devel]
+time:
+  pixi: [time]
+tinyxml:
+  pixi: [tinyxml]
+tinyxml2:
+  pixi: [tinyxml2]
+udev:
+  pixi:
+    linux: [libusb, libudev]
+    osx: [libusb]
+    win64: [libusb]
+uncrustify:
+  pixi: [uncrustify]
+unzip:
+  pixi: [unzip]
+uuid:
+  pixi:
+    linux: [libuuid]
+    osx: []
+    win64: []
+virtualenv:
+  pixi: [virtualenv]
+libwebsocketpp-dev:
+  pixi: [websocketpp]
+wget:
+  pixi: [wget]
+xsimd:
+  pixi: [xsimd]
+xtensor:
+  pixi: [xtensor ==0.24.7]
+wx-common:
+  pixi: [wxpython]
+wxpython:
+  pixi: [wxpython]
+wxwidgets:
+  pixi: [wxpython]
+x11-dev:
+  pixi: [xorg-libx11, REQUIRE_OPENGL]
+yaml:
+  pixi: [yaml, yaml-cpp]
+yaml-cpp:
+  pixi: [yaml-cpp]
+zbar:
+  pixi: [zbar]
+zlib:
+  pixi: [zlib]
+zziplib:
+  pixi: [zziplib]
