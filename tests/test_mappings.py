@@ -6,6 +6,7 @@ from tempfile import TemporaryDirectory
 import pytest
 
 from pixi_ros.mappings import (
+    expand_gl_requirements,
     get_mappings,
     get_robostack_yaml_path,
     get_ros_distros,
@@ -27,7 +28,9 @@ def test_map_common_packages():
 def test_map_build_tools():
     """Test mapping of build tools (unmapped, uses fallback)."""
     assert map_ros_to_conda("ament_cmake", "humble") == ["ros-humble-ament-cmake"]
-    assert map_ros_to_conda("ament_cmake_gtest", "iron") == ["ros-iron-ament-cmake-gtest"]
+    assert map_ros_to_conda("ament_cmake_gtest", "iron") == [
+        "ros-iron-ament-cmake-gtest"
+    ]
 
 
 def test_map_unknown_package():
@@ -191,7 +194,9 @@ another_package:
             reload_mappings()  # Clear cache
 
             # Should load custom mappings
-            assert map_ros_to_conda("custom_package", "humble") == ["custom-conda-package"]
+            assert map_ros_to_conda("custom_package", "humble") == [
+                "custom-conda-package"
+            ]
             # Platform-specific mapping (will vary by platform)
             result = map_ros_to_conda("another_package", "humble")
             assert isinstance(result, list)
@@ -200,3 +205,93 @@ another_package:
         finally:
             os.chdir(old_cwd)
             reload_mappings()  # Restore default mappings
+
+
+def test_opengl_returns_require_opengl_placeholder():
+    """Test that 'opengl' dependency returns REQUIRE_OPENGL placeholder from mapping."""
+    # On Linux, opengl maps to REQUIRE_OPENGL
+    result = map_ros_to_conda("opengl", "humble", platform_override="linux")
+    assert result == ["REQUIRE_OPENGL"]
+
+    # On macOS, opengl also maps to REQUIRE_OPENGL
+    result = map_ros_to_conda("opengl", "humble", platform_override="osx")
+    assert result == ["REQUIRE_OPENGL"]
+
+    # On Windows, opengl maps to empty list
+    result = map_ros_to_conda("opengl", "humble", platform_override="win64")
+    assert result == []
+
+
+def test_qt_packages_include_require_opengl():
+    """Test that Qt packages include REQUIRE_OPENGL placeholder from mapping."""
+    # libqt5-core should include qt-main and REQUIRE_OPENGL
+    result = map_ros_to_conda("libqt5-core", "humble")
+    assert "qt-main" in result
+    assert "REQUIRE_OPENGL" in result
+
+
+def test_expand_gl_requirements_linux():
+    """Test expanding GL requirements on Linux."""
+    # Test REQUIRE_GL
+    result = expand_gl_requirements(["cmake", "REQUIRE_GL"], platform_override="linux")
+    assert "cmake" in result
+    assert "libgl-devel" in result
+    assert "REQUIRE_GL" not in result
+
+    # Test REQUIRE_OPENGL
+    result = expand_gl_requirements(
+        ["cmake", "REQUIRE_OPENGL"], platform_override="linux"
+    )
+    assert "cmake" in result
+    assert "libgl-devel" in result
+    assert "libopengl-devel" in result
+    assert "xorg-libx11" in result
+    assert "xorg-libxext" in result
+    assert "REQUIRE_OPENGL" not in result
+
+
+def test_expand_gl_requirements_osx():
+    """Test expanding GL requirements on macOS."""
+    # Test REQUIRE_GL (should be removed, nothing added)
+    result = expand_gl_requirements(["cmake", "REQUIRE_GL"], platform_override="osx")
+    assert result == ["cmake"]
+    assert "REQUIRE_GL" not in result
+
+    # Test REQUIRE_OPENGL (should add X11 packages)
+    result = expand_gl_requirements(
+        ["cmake", "REQUIRE_OPENGL"], platform_override="osx"
+    )
+    assert "cmake" in result
+    assert "xorg-libx11" in result
+    assert "xorg-libxext" in result
+    assert "libgl-devel" not in result
+    assert "libopengl-devel" not in result
+    assert "REQUIRE_OPENGL" not in result
+
+
+def test_expand_gl_requirements_win64():
+    """Test expanding GL requirements on Windows."""
+    # Test REQUIRE_GL (should be removed, nothing added)
+    result = expand_gl_requirements(
+        ["cmake", "REQUIRE_GL"], platform_override="win64"
+    )
+    assert result == ["cmake"]
+
+    # Test REQUIRE_OPENGL (should be removed, nothing added)
+    result = expand_gl_requirements(
+        ["cmake", "REQUIRE_OPENGL"], platform_override="win64"
+    )
+    assert result == ["cmake"]
+
+
+def test_expand_gl_requirements_deduplicates():
+    """Test that expand_gl_requirements removes duplicates."""
+    # If both REQUIRE_GL and REQUIRE_OPENGL are present, libgl-devel should only appear once
+    result = expand_gl_requirements(
+        ["REQUIRE_GL", "REQUIRE_OPENGL"], platform_override="linux"
+    )
+    # Count occurrences of libgl-devel
+    assert result.count("libgl-devel") == 1
+    assert "libopengl-devel" in result
+    assert "xorg-libx11" in result
+    assert "xorg-libxext" in result

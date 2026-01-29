@@ -90,7 +90,9 @@ def find_workspace_root(start_path: Path | None = None) -> Path | None:
             relative_parts = relative_path.parts
 
             # Skip if any parent is hidden or in skip list
-            if any(part.startswith(".") or part in skip_dirs for part in relative_parts):
+            if any(
+                part.startswith(".") or part in skip_dirs for part in relative_parts
+            ):
                 continue
 
             # Skip if matched by gitignore patterns

@@ -1087,6 +1087,7 @@ packages:
   - pyyaml >=6.0
   - py-rattler >=0.6.0
   - pathspec >=0.11.0
+  - rich >=13.0.0
 - conda: https://prefix.dev/conda-forge/noarch/pluggy-1.6.0-pyhf9edf01_1.conda
   sha256: e14aafa63efa0528ca99ba568eaf506eb55a0371d12e6250aaaa61718d2eb62e
   md5: d7585b6550ad04c8c5e21097ada2888e

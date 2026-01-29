@@ -5,10 +5,14 @@ from pathlib import Path
 import tomlkit
 import typer
 from rattler import Platform
+from rich.console import Console
+from rich.table import Table
 
-from pixi_ros.mappings import map_ros_to_conda, validate_distro
+from pixi_ros.mappings import expand_gl_requirements, map_ros_to_conda, validate_distro
 from pixi_ros.utils import detect_cmake_version_requirement
 from pixi_ros.workspace import discover_packages, find_workspace_root
+
+console = Console()
 
 
 def init_workspace(distro: str, workspace_path: Path | None = None) -> bool:
@@ -59,8 +63,9 @@ def init_workspace(distro: str, workspace_path: Path | None = None) -> bool:
         typer.echo(f"Error discovering packages: {e}", err=True)
         raise typer.Exit(code=1) from e
 
-    package_names = ", ".join(p.name for p in packages)
-    typer.echo(f"Found {len(packages)} package(s): {package_names}")
+    if packages:
+        package_names = ", ".join(p.name for p in packages)
+        typer.echo(f"Found {len(packages)} package(s): {package_names}")
 
     # Load or create pixi.toml
     pixi_toml_path = workspace_path / "pixi.toml"
@@ -75,6 +80,9 @@ def init_workspace(distro: str, workspace_path: Path | None = None) -> bool:
     else:
         typer.echo(f"Creating new {pixi_toml_path}")
         pixi_config = tomlkit.document()
+
+    # Display discovered dependencies
+    _display_dependencies(packages, distro)
 
     # Update configuration
     _ensure_workspace_section(pixi_config, workspace_path)
@@ -110,6 +118,90 @@ def init_workspace(distro: str, workspace_path: Path | None = None) -> bool:
     except Exception as e:
         typer.echo(f"Error writing pixi.toml: {e}", err=True)
         raise typer.Exit(code=1) from e
+
+
+def _display_dependencies(packages, distro: str):
+    """Display discovered dependencies in a rich table."""
+    if not packages:
+        return
+
+    workspace_pkg_names = {pkg.name for pkg in packages}
+
+    # Collect dependencies organized by ROS package and type
+    # Structure: {pkg_name: {dep_type: {ros_dep: [conda_packages]}}}
+    pkg_deps: dict[str, dict[str, dict[str, list[str]]]] = {}
+
+    for pkg in packages:
+        pkg_deps[pkg.name] = {"Build": {}, "Runtime": {}, "Test": {}}
+
+        # Build dependencies
+        for ros_dep in pkg.get_all_build_dependencies():
+            if ros_dep in workspace_pkg_names:
+                continue
+            conda_packages = map_ros_to_conda(ros_dep, distro)
+            if conda_packages:
+                pkg_deps[pkg.name]["Build"][ros_dep] = conda_packages
+
+        # Runtime dependencies
+        for ros_dep in pkg.get_all_runtime_dependencies():
+            if ros_dep in workspace_pkg_names:
+                continue
+            conda_packages = map_ros_to_conda(ros_dep, distro)
+            if conda_packages:
+                pkg_deps[pkg.name]["Runtime"][ros_dep] = conda_packages
+
+        # Test dependencies
+        for ros_dep in pkg.get_all_test_dependencies():
+            if ros_dep in workspace_pkg_names:
+                continue
+            conda_packages = map_ros_to_conda(ros_dep, distro)
+            if conda_packages:
+                pkg_deps[pkg.name]["Test"][ros_dep] = conda_packages
+
+    # Check if any external dependencies exist
+    has_deps = any(
+        any(pkg_deps[pkg_name][dep_type] for dep_type in ["Build", "Runtime", "Test"])
+        for pkg_name in pkg_deps
+    )
+
+    if not has_deps:
+        console.print("\n[yellow]No external dependencies found[/yellow]")
+        return
+
+    console.print("")
+
+    # Display one table per ROS package with all dependency types
+    for pkg_name in sorted(pkg_deps.keys()):
+        pkg_info = pkg_deps[pkg_name]
+
+        # Collect all dependencies for this package across all types
+        all_deps = []
+        for dep_type in ["Build", "Runtime", "Test"]:
+            for ros_dep in sorted(pkg_info[dep_type].keys()):
+                conda_pkgs = pkg_info[dep_type][ros_dep]
+                conda_str = ", ".join(conda_pkgs)
+                all_deps.append((ros_dep, dep_type, conda_str))
+
+        # Skip packages with no external dependencies
+        if not all_deps:
+            continue
+
+        # Create table for this package
+        table = Table(
+            title=f"Package: {pkg_name}",
+            show_header=True,
+            header_style="bold cyan",
+        )
+        table.add_column("ROS Dependency", style="yellow")
+        table.add_column("Type", style="blue")
+        table.add_column("Conda Packages", style="green")
+
+        # Add all dependencies for this package
+        for ros_dep, dep_type, conda_str in all_deps:
+            table.add_row(ros_dep, dep_type, conda_str)
+
+        console.print(table)
+        console.print("")
 
 
 def _ensure_workspace_section(config: dict, workspace_path: Path):
@@ -179,11 +271,39 @@ def _ensure_dependencies(config: dict, packages, distro: str):
 
             # Map to conda packages
             conda_packages = map_ros_to_conda(ros_dep, distro)
+
+            # Skip if no conda packages were returned
+            if not conda_packages:
+                continue
+
             for conda_dep in conda_packages:
                 if conda_dep:
                     if conda_dep not in dep_sources:
                         dep_sources[conda_dep] = set()
                     dep_sources[conda_dep].add(pkg.name)
+
+    # Expand GL requirements (REQUIRE_GL, REQUIRE_OPENGL) to platform-specific packages
+    # This replaces placeholder strings with actual conda packages
+    expanded_dep_sources: dict[str, set[str]] = {}
+    all_conda_packages = list(dep_sources.keys())
+    expanded_packages = expand_gl_requirements(all_conda_packages)
+
+    # Rebuild dep_sources with expanded packages
+    for expanded_pkg in expanded_packages:
+        # For expanded packages, merge the sources from the placeholder packages
+        sources = set()
+        for original_pkg, pkg_sources in dep_sources.items():
+            if original_pkg == expanded_pkg:
+                # Direct match
+                sources.update(pkg_sources)
+            elif original_pkg in ("REQUIRE_GL", "REQUIRE_OPENGL"):
+                # This was a placeholder, include its sources for all expanded packages
+                sources.update(pkg_sources)
+
+        if sources:
+            expanded_dep_sources[expanded_pkg] = sources
+
+    dep_sources = expanded_dep_sources
 
     # Create or get dependencies table
     if "dependencies" not in config:
@@ -220,35 +340,14 @@ def _ensure_dependencies(config: dict, packages, distro: str):
     if "cmake" in dep_versions and "cmake" not in dependencies:
         dependencies["cmake"] = dep_versions["cmake"]
 
-    # Add package dependencies with source comments
+    # Add package dependencies
     if dep_sources:
-        # Group dependencies by their source packages
-        # sources_key -> list of conda deps
-        groups: dict[str, list[str]] = {}
-        for conda_dep, sources in dep_sources.items():
+        dependencies.add(tomlkit.nl())
+        dependencies.add(tomlkit.comment("Workspace dependencies"))
+
+        # Add all dependencies in alphabetical order
+        for conda_dep in sorted(dep_sources.keys()):
             if conda_dep not in dependencies:
-                sources_key = ", ".join(sorted(sources))
-                if sources_key not in groups:
-                    groups[sources_key] = []
-                groups[sources_key].append(conda_dep)
-
-        # Sort groups by collection size (largest first), then alphabetically
-        sorted_groups = sorted(
-            groups.keys(),
-            key=lambda k: (-len(k.split(", ")), k)
-        )
-
-        # Add groups in sorted order
-        for sources_key in sorted_groups:
-            dependencies.add(tomlkit.nl())
-            sources_list = sources_key.split(", ")
-            if len(sources_list) == 1:
-                comment = f"From package: {sources_key}"
-            else:
-                comment = f"From packages: {sources_key}"
-            dependencies.add(tomlkit.comment(comment))
-
-            for conda_dep in sorted(groups[sources_key]):
                 # Use version constraint if available, otherwise "*"
                 version = dep_versions.get(conda_dep, "*")
                 dependencies[conda_dep] = version

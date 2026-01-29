@@ -108,20 +108,27 @@ def map_ros_to_conda(
     """
     Map a ROS package name to its conda package names.
 
+    Note: The returned list may contain special placeholders like REQUIRE_GL
+    or REQUIRE_OPENGL (from the mapping files). These should be expanded
+    using expand_gl_requirements().
+
     Args:
-        ros_package: The ROS package name (e.g., "rclcpp", "udev")
+        ros_package: The ROS package name (e.g., "rclcpp", "udev", "opengl")
         distro: The ROS distribution (e.g., "humble", "iron", "jazzy")
         platform_override: Override platform detection (for testing)
 
     Returns:
-        List of conda package names
-        (e.g., ["ros-humble-rclcpp"] or ["libusb", "libudev"])
+        List of conda package names, which may include placeholder strings
+        like REQUIRE_GL or REQUIRE_OPENGL that need expansion
+        (e.g., ["ros-humble-rclcpp"], ["libusb", "libudev"], or ["REQUIRE_OPENGL"])
 
     Examples:
         >>> map_ros_to_conda("udev", "humble")  # doctest: +SKIP
         ['libusb', 'libudev']  # on linux
         >>> map_ros_to_conda("uncrustify", "humble")
         ['uncrustify']
+        >>> map_ros_to_conda("opengl", "humble")  # doctest: +SKIP
+        ['REQUIRE_OPENGL']  # placeholder from mapping file
     """
     mappings = get_mappings()
     current_platform = platform_override or _detect_platform()
@@ -148,6 +155,68 @@ def map_ros_to_conda(
     # This follows the robostack convention
     conda_name = ros_package.replace("_", "-")
     return [f"ros-{distro}-{conda_name}"]
+
+
+def expand_gl_requirements(
+    conda_packages: list[str], platform_override: str | None = None
+) -> list[str]:
+    """
+    Process special GL requirements in a list of conda packages.
+
+    Replaces REQUIRE_GL and REQUIRE_OPENGL placeholders with actual
+    platform-specific conda packages.
+
+    This is a duplication of the code in:
+    https://github.com/RoboStack/vinca/blob/7d3a05e01d6898201a66ba2cf6ea771250671f58/vinca/main.py#L562
+
+    Args:
+        conda_packages: List of conda package names (may contain REQUIRE_GL/REQUIRE_OPENGL)
+        platform_override: Override platform detection (for testing)
+
+    Returns:
+        List of conda packages with GL requirements expanded
+
+    Examples:
+        >>> expand_gl_requirements(["cmake", "REQUIRE_GL"], platform_override="linux")
+        ['cmake', 'libgl-devel']
+        >>> expand_gl_requirements(["REQUIRE_GL"], platform_override="osx")
+        []
+    """
+    current_platform = platform_override or _detect_platform()
+    result = []
+    additional_packages = []
+
+    for pkg in conda_packages:
+        if pkg == "REQUIRE_GL":
+            # Replace REQUIRE_GL with platform-specific packages
+            if current_platform == "linux":
+                additional_packages.append("libgl-devel")
+            # On other platforms, just remove it (add nothing)
+        elif pkg == "REQUIRE_OPENGL":
+            # Replace REQUIRE_OPENGL with platform-specific packages
+            if current_platform == "linux":
+                # TODO: this should only go into the host dependencies
+                additional_packages.extend(["libgl-devel", "libopengl-devel"])
+            if current_platform in ["linux", "osx"]:
+                # TODO: force this into the run dependencies
+                additional_packages.extend(["xorg-libx11", "xorg-libxext"])
+            # On windows, just remove it (add nothing)
+        else:
+            # Regular package, keep it
+            result.append(pkg)
+
+    # Add the additional packages and deduplicate
+    result.extend(additional_packages)
+
+    # Remove duplicates while preserving order
+    seen = set()
+    deduplicated = []
+    for pkg in result:
+        if pkg not in seen:
+            seen.add(pkg)
+            deduplicated.append(pkg)
+
+    return deduplicated
 
 
 def is_system_package(package_name: str) -> bool:
