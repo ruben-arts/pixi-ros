@@ -1073,7 +1073,7 @@ packages:
   timestamp: 1769677743677
 - conda: .
   name: pixi-ros
-  version: 0.1.0
+  version: 0.1.1
   build: pyh4616a5c_0
   subdir: noarch
   variants:
@@ -1088,6 +1088,7 @@ packages:
   - py-rattler >=0.6.0
   - pathspec >=0.11.0
   - rich >=13.0.0
+  license: MIT
 - conda: https://prefix.dev/conda-forge/noarch/pluggy-1.6.0-pyhf9edf01_1.conda
   sha256: e14aafa63efa0528ca99ba568eaf506eb55a0371d12e6250aaaa61718d2eb62e
   md5: d7585b6550ad04c8c5e21097ada2888e

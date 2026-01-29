@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pixi-ros"
-version = "0.1.0"
+version = "0.1.1"
 description = "Pixi extension for ROS package management"
 authors = [
     { name = "Ruben Arts", email = "ruben@prefix.dev" }
