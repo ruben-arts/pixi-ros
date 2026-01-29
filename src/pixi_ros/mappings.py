@@ -255,6 +255,41 @@ def is_system_package(package_name: str) -> bool:
     return package_name in system_packages
 
 
+def get_platforms() -> list[str]:
+    """
+    Get list of supported platforms from mapping files.
+
+    Extracts platform names from the mapping data structure.
+    Common platforms: linux, osx, win64
+
+    Returns:
+        List of platform names used in mappings
+    """
+    mappings = get_mappings()
+    platforms = set()
+
+    # Iterate through mappings to find all platform keys
+    for package_mappings in mappings.values():
+        for channel_mapping in package_mappings.values():
+            if isinstance(channel_mapping, dict):
+                # This is a platform-specific mapping
+                platforms.update(channel_mapping.keys())
+
+    # Return sorted list, with common order
+    platform_order = ["linux", "osx", "win64", "win"]
+    result = []
+    for p in platform_order:
+        if p in platforms:
+            result.append(p)
+
+    # Add any other platforms not in the predefined order
+    for p in sorted(platforms):
+        if p not in result:
+            result.append(p)
+
+    return result if result else ["linux", "osx", "win64"]
+
+
 def get_ros_distros() -> list[str]:
     """
     Get list of supported ROS distributions.

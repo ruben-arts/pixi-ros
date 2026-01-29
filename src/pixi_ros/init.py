@@ -17,13 +17,18 @@ from pixi_ros.workspace import discover_packages, find_workspace_root
 console = Console()
 
 
-def init_workspace(distro: str, workspace_path: Path | None = None) -> bool:
+def init_workspace(
+    distro: str,
+    workspace_path: Path | None = None,
+    platforms: list[str] | None = None,
+) -> bool:
     """
     Initialize or update pixi.toml for a ROS workspace.
 
     Args:
         distro: ROS distribution (e.g., "humble", "iron", "jazzy")
         workspace_path: Path to workspace root (defaults to current directory)
+        platforms: Target platforms (e.g., ["linux-64", "osx-arm64"])
 
     Returns:
         True if successful, False otherwise
@@ -87,9 +92,9 @@ def init_workspace(distro: str, workspace_path: Path | None = None) -> bool:
     _display_dependencies(packages, distro)
 
     # Update configuration
-    _ensure_workspace_section(pixi_config, workspace_path)
+    _ensure_workspace_section(pixi_config, workspace_path, platforms)
     _ensure_channels(pixi_config, distro)
-    _ensure_dependencies(pixi_config, packages, distro)
+    _ensure_dependencies(pixi_config, packages, distro, platforms)
     _ensure_tasks(pixi_config)
     _ensure_activation(pixi_config)
 
@@ -232,7 +237,9 @@ def _display_dependencies(packages, distro: str):
         console.print("")
 
 
-def _ensure_workspace_section(config: dict, workspace_path: Path):
+def _ensure_workspace_section(
+    config: dict, workspace_path: Path, platforms: list[str] | None = None
+):
     """Ensure workspace section exists with basic config."""
     if "workspace" not in config:
         config["workspace"] = {}
@@ -247,11 +254,28 @@ def _ensure_workspace_section(config: dict, workspace_path: Path):
     if "channels" not in workspace:
         workspace["channels"] = []
 
-    # Set platforms if not present
-    if "platforms" not in workspace:
-        # Only add the current platform by default
-        current_platform = str(Platform.current())
-        workspace["platforms"] = [current_platform]
+    # Set platforms if not present or if platforms were provided
+    if "platforms" not in workspace or platforms:
+        if platforms:
+            # Convert mapping platform names to pixi platform names
+            # Mapping: linux, osx, win64 -> pixi: linux-64, osx-64/osx-arm64, win-64
+            pixi_platforms = []
+            for platform in platforms:
+                if platform == "linux":
+                    pixi_platforms.append("linux-64")
+                elif platform == "osx":
+                    # Add both Intel and ARM for osx
+                    pixi_platforms.extend(["osx-64", "osx-arm64"])
+                elif platform == "win64":
+                    pixi_platforms.append("win-64")
+                else:
+                    # Unknown platform, add as-is
+                    pixi_platforms.append(platform)
+            workspace["platforms"] = pixi_platforms
+        else:
+            # Only add the current platform by default
+            current_platform = str(Platform.current())
+            workspace["platforms"] = [current_platform]
 
 
 def _ensure_channels(config: dict, distro: str):
@@ -326,8 +350,19 @@ def _check_package_availability(
     return availability
 
 
-def _ensure_dependencies(config: dict, packages, distro: str):
-    """Ensure all ROS dependencies are present with comments showing source."""
+def _ensure_dependencies(
+    config: dict, packages, distro: str, platforms: list[str] | None = None
+):
+    """
+    Ensure all ROS dependencies are present with comments showing source.
+
+    Generates platform-specific dependencies if multiple platforms are specified.
+    Common dependencies (available on all platforms) go in [dependencies],
+    platform-specific ones go in [target.{platform}.dependencies].
+    """
+    # Default to current platform if none specified
+    if not platforms:
+        platforms = [str(Platform.current())]
     # Track which packages depend on which conda packages
     # conda_dep -> set of package names
     dep_sources: dict[str, set[str]] = {}
@@ -343,48 +378,75 @@ def _ensure_dependencies(config: dict, packages, distro: str):
         if cmake_version:
             dep_versions["cmake"] = cmake_version
 
-    # Collect dependencies from each package
-    for pkg in packages:
-        for ros_dep in pkg.get_all_dependencies():
-            # Skip workspace packages (they're built locally)
-            if ros_dep in workspace_pkg_names:
-                continue
+    # Platforms now come directly from mappings (linux, osx, win64)
+    # Use them directly as both platform_override and target names
 
-            # Map to conda packages
-            conda_packages = map_ros_to_conda(ros_dep, distro)
+    # Collect dependencies per platform
+    # Structure: platform -> conda_dep -> set of ROS package names
+    platform_deps: dict[str, dict[str, set[str]]] = {
+        platform: {} for platform in platforms
+    }
 
-            # Skip if no conda packages were returned
-            if not conda_packages:
-                continue
+    # Collect dependencies from each package, mapped for each platform
+    for platform in platforms:
+        for pkg in packages:
+            for ros_dep in pkg.get_all_dependencies():
+                # Skip workspace packages (they're built locally)
+                if ros_dep in workspace_pkg_names:
+                    continue
 
-            for conda_dep in conda_packages:
-                if conda_dep:
-                    if conda_dep not in dep_sources:
-                        dep_sources[conda_dep] = set()
-                    dep_sources[conda_dep].add(pkg.name)
+                # Map to conda packages for this platform
+                conda_packages = map_ros_to_conda(
+                    ros_dep, distro, platform_override=platform
+                )
 
-    # Expand GL requirements (REQUIRE_GL, REQUIRE_OPENGL) to platform-specific packages
-    # This replaces placeholder strings with actual conda packages
-    expanded_dep_sources: dict[str, set[str]] = {}
-    all_conda_packages = list(dep_sources.keys())
-    expanded_packages = expand_gl_requirements(all_conda_packages)
+                # Skip if no conda packages were returned
+                if not conda_packages:
+                    continue
 
-    # Rebuild dep_sources with expanded packages
-    for expanded_pkg in expanded_packages:
-        # For expanded packages, merge the sources from the placeholder packages
-        sources = set()
-        for original_pkg, pkg_sources in dep_sources.items():
-            if original_pkg == expanded_pkg:
-                # Direct match
-                sources.update(pkg_sources)
-            elif original_pkg in ("REQUIRE_GL", "REQUIRE_OPENGL"):
-                # This was a placeholder, include its sources for all expanded packages
-                sources.update(pkg_sources)
+                for conda_dep in conda_packages:
+                    if conda_dep:
+                        if conda_dep not in platform_deps[platform]:
+                            platform_deps[platform][conda_dep] = set()
+                        platform_deps[platform][conda_dep].add(pkg.name)
 
-        if sources:
-            expanded_dep_sources[expanded_pkg] = sources
+        # Expand GL requirements for this platform
+        all_conda_packages = list(platform_deps[platform].keys())
+        expanded_packages = expand_gl_requirements(
+            all_conda_packages, platform_override=platform
+        )
 
-    dep_sources = expanded_dep_sources
+        # Rebuild platform deps with expanded packages
+        expanded_platform_deps: dict[str, set[str]] = {}
+        for expanded_pkg in expanded_packages:
+            sources = set()
+            for original_pkg, pkg_sources in platform_deps[platform].items():
+                if original_pkg == expanded_pkg:
+                    sources.update(pkg_sources)
+                elif original_pkg in ("REQUIRE_GL", "REQUIRE_OPENGL"):
+                    sources.update(pkg_sources)
+
+            if sources:
+                expanded_platform_deps[expanded_pkg] = sources
+
+        platform_deps[platform] = expanded_platform_deps
+
+    # Determine common dependencies (present in all platforms)
+    if len(platforms) > 1:
+        all_deps = set(platform_deps[platforms[0]].keys())
+        for platform in platforms[1:]:
+            all_deps &= set(platform_deps[platform].keys())
+        common_deps = all_deps
+    else:
+        # Single platform - all deps are "common"
+        common_deps = set(platform_deps[platforms[0]].keys())
+
+    # For backwards compatibility when single platform, use old behavior
+    dep_sources = platform_deps[platforms[0]] if len(platforms) == 1 else {
+        dep: platform_deps[platforms[0]][dep]
+        for dep in common_deps
+        if dep in platform_deps[platforms[0]]
+    }
 
     # Create or get dependencies table
     if "dependencies" not in config:
@@ -426,51 +488,55 @@ def _ensure_dependencies(config: dict, packages, distro: str):
         dependencies["cmake"] = dep_versions["cmake"]
 
     # Add package dependencies
+    channels = config.get("workspace", {}).get("channels", [])
+
+    # Add common dependencies (available on all platforms)
     if dep_sources:
         dependencies.add(tomlkit.nl())
-        dependencies.add(tomlkit.comment("Workspace dependencies"))
+        if len(platforms) > 1:
+            dependencies.add(tomlkit.comment("Workspace dependencies (common across platforms)"))
+        else:
+            dependencies.add(tomlkit.comment("Workspace dependencies"))
 
-        # Get channels and platform for availability checking
-        channels = config.get("workspace", {}).get("channels", [])
-        current_platform = Platform.current()
+        # For common deps, check on first platform as representative
+        first_platform_name = platforms[0]
+        # Map platform name to rattler Platform
+        platform_rattler_map = {
+            "linux": "linux-64",
+            "osx": "osx-arm64",
+            "win64": "win-64",
+        }
+        first_platform_str = platform_rattler_map.get(first_platform_name, "linux-64")
+        first_platform = Platform(first_platform_str)
 
-        # Get list of packages to check
         packages_to_check = [
             conda_dep
             for conda_dep in dep_sources.keys()
             if conda_dep not in dependencies
         ]
 
-        # Check package availability if channels are configured
         availability = {}
         if channels and packages_to_check:
-            typer.echo("Checking package availability in channels...")
+            typer.echo(f"Checking common package availability for {first_platform_name}...")
             availability = _check_package_availability(
-                packages_to_check, channels, current_platform
+                packages_to_check, channels, first_platform
             )
 
-        # Add all dependencies in alphabetical order
         available_packages = []
         unavailable_packages = []
 
         for conda_dep in sorted(dep_sources.keys()):
             if conda_dep not in dependencies:
-                # Check if we have availability info
-                is_available = availability.get(
-                    conda_dep, True
-                )  # Default to True if not checked
-
+                is_available = availability.get(conda_dep, True)
                 if is_available:
                     available_packages.append(conda_dep)
                 else:
                     unavailable_packages.append(conda_dep)
 
-        # Add available packages
         for conda_dep in available_packages:
             version = dep_versions.get(conda_dep, "*")
             dependencies[conda_dep] = version
 
-        # Add unavailable packages as comments
         if unavailable_packages:
             dependencies.add(tomlkit.nl())
             dependencies.add(
@@ -485,6 +551,76 @@ def _ensure_dependencies(config: dict, packages, distro: str):
                 )
 
     config["dependencies"] = dependencies
+
+    # Add platform-specific dependencies if multiple platforms
+    if len(platforms) > 1:
+        for platform in platforms:
+            platform_specific_deps = {
+                dep: sources
+                for dep, sources in platform_deps[platform].items()
+                if dep not in common_deps
+            }
+
+            if platform_specific_deps:
+                # Create target section if needed
+                if "target" not in config:
+                    config["target"] = tomlkit.table()
+                if platform not in config["target"]:
+                    config["target"][platform] = tomlkit.table()
+                if "dependencies" not in config["target"][platform]:
+                    config["target"][platform]["dependencies"] = tomlkit.table()
+
+                target_deps = config["target"][platform]["dependencies"]
+
+                # Add comment
+                if len(target_deps) == 0:
+                    target_deps.add(
+                        tomlkit.comment(f"Platform-specific dependencies for {platform}")
+                    )
+
+                # Check availability for this platform
+                # Map platform name to rattler Platform if needed
+                platform_rattler_map = {
+                    "linux": "linux-64",
+                    "osx": "osx-arm64",  # Use ARM as default for osx
+                    "win64": "win-64",
+                }
+                rattler_platform_str = platform_rattler_map.get(platform, "linux-64")
+                platform_obj = Platform(rattler_platform_str)
+                packages_to_check = list(platform_specific_deps.keys())
+
+                availability = {}
+                if channels and packages_to_check:
+                    typer.echo(f"Checking package availability for {platform}...")
+                    availability = _check_package_availability(
+                        packages_to_check, channels, platform_obj
+                    )
+
+                available_packages = []
+                unavailable_packages = []
+
+                for conda_dep in sorted(platform_specific_deps.keys()):
+                    if conda_dep not in target_deps:
+                        is_available = availability.get(conda_dep, True)
+                        if is_available:
+                            available_packages.append(conda_dep)
+                        else:
+                            unavailable_packages.append(conda_dep)
+
+                for conda_dep in available_packages:
+                    version = dep_versions.get(conda_dep, "*")
+                    target_deps[conda_dep] = version
+
+                if unavailable_packages:
+                    target_deps.add(tomlkit.nl())
+                    target_deps.add(
+                        tomlkit.comment("The following packages were not found:")
+                    )
+                    for conda_dep in unavailable_packages:
+                        version = dep_versions.get(conda_dep, "*")
+                        target_deps.add(
+                            tomlkit.comment(f'{conda_dep} = "{version}"  # NOT FOUND')
+                        )
 
 
 def _ensure_tasks(config: dict):
