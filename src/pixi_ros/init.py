@@ -393,7 +393,9 @@ def _ensure_dependencies(
                 if conda_dep and not conda_dep.startswith("REQUIRE_"):
                     # If package already has a constraint, combine them
                     if conda_dep in dep_versions:
-                        dep_versions[conda_dep] = f"{dep_versions[conda_dep]},{version_constraint}"
+                        dep_versions[conda_dep] = (
+                            f"{dep_versions[conda_dep]},{version_constraint}"
+                        )
                     else:
                         dep_versions[conda_dep] = version_constraint
 
@@ -477,11 +479,15 @@ def _ensure_dependencies(
         common_deps = set(platform_deps[mapping_platform_list[0]].keys())
 
     # For backwards compatibility when single platform, use old behavior
-    dep_sources = platform_deps[mapping_platform_list[0]] if len(mapping_platform_list) == 1 else {
-        dep: platform_deps[mapping_platform_list[0]][dep]
-        for dep in common_deps
-        if dep in platform_deps[mapping_platform_list[0]]
-    }
+    dep_sources = (
+        platform_deps[mapping_platform_list[0]]
+        if len(mapping_platform_list) == 1
+        else {
+            dep: platform_deps[mapping_platform_list[0]][dep]
+            for dep in common_deps
+            if dep in platform_deps[mapping_platform_list[0]]
+        }
+    )
 
     # Create or get dependencies table
     if "dependencies" not in config:
@@ -529,7 +535,9 @@ def _ensure_dependencies(
     if dep_sources:
         dependencies.add(tomlkit.nl())
         if len(mapping_platform_list) > 1:
-            dependencies.add(tomlkit.comment("Workspace dependencies (common across platforms)"))
+            dependencies.add(
+                tomlkit.comment("Workspace dependencies (common across platforms)")
+            )
         else:
             dependencies.add(tomlkit.comment("Workspace dependencies"))
 
@@ -545,7 +553,9 @@ def _ensure_dependencies(
 
         availability = {}
         if channels and packages_to_check:
-            typer.echo(f"Checking common package availability for {first_pixi_platform}...")
+            typer.echo(
+                f"Checking common package availability for {first_pixi_platform}..."
+            )
             availability = _check_package_availability(
                 packages_to_check, channels, first_platform
             )
@@ -596,7 +606,9 @@ def _ensure_dependencies(
 
             # If we also have windows, only move to unix if NOT on windows
             if has_win:
-                win_deps = set(platform_deps.get("win64", {}).keys()) | set(platform_deps.get("win", {}).keys())
+                win_deps = set(platform_deps.get("win64", {}).keys()) | set(
+                    platform_deps.get("win", {}).keys()
+                )
                 unix_deps_keys = unix_candidates - win_deps
             else:
                 unix_deps_keys = unix_candidates
@@ -623,7 +635,9 @@ def _ensure_dependencies(
                 )
 
             # Check availability on linux platform as representative
-            representative_pixi_platform = platform_groups.get("linux", platform_groups.get("osx", platforms))[0]
+            representative_pixi_platform = platform_groups.get(
+                "linux", platform_groups.get("osx", platforms)
+            )[0]
             platform_obj = Platform(representative_pixi_platform)
             packages_to_check = list(unix_deps.keys())
 
@@ -683,7 +697,9 @@ def _ensure_dependencies(
                 # Add comment
                 if len(target_deps) == 0:
                     target_deps.add(
-                        tomlkit.comment(f"Platform-specific dependencies for {mapping_platform}")
+                        tomlkit.comment(
+                            f"Platform-specific dependencies for {mapping_platform}"
+                        )
                     )
 
                 # Check availability for this mapping platform
@@ -694,7 +710,9 @@ def _ensure_dependencies(
 
                 availability = {}
                 if channels and packages_to_check:
-                    typer.echo(f"Checking package availability for {mapping_platform}...")
+                    typer.echo(
+                        f"Checking package availability for {mapping_platform}..."
+                    )
                     availability = _check_package_availability(
                         packages_to_check, channels, platform_obj
                     )
@@ -735,10 +753,6 @@ def _ensure_tasks(config: dict):
         "build": {
             "cmd": "colcon build",
             "description": "Build the ROS workspace",
-        },
-        "build-no-error": {
-            "cmd": "colcon build --continue-on-error --cmake-args -DCMAKE_CXX_FLAGS=\"-Wno-error\"",
-            "description": "Build the workspace ignoring errors and warnings",
         },
         "test": {
             "cmd": "colcon test",

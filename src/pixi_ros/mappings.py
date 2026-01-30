@@ -287,7 +287,11 @@ def get_platforms() -> list[str]:
     if "win64" in mapping_platforms or "win" in mapping_platforms:
         pixi_platforms.append("win-64")
 
-    return pixi_platforms if pixi_platforms else ["linux-64", "osx-64", "osx-arm64", "win-64"]
+    return (
+        pixi_platforms
+        if pixi_platforms
+        else ["linux-64", "osx-64", "osx-arm64", "win-64"]
+    )
 
 
 def get_ros_distros() -> list[str]:

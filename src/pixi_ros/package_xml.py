@@ -34,7 +34,8 @@ class PackageXML:
     depends: list[str] = field(default_factory=list)
 
     # Version constraints for dependencies
-    # Maps package name to version constraint string (e.g., ">=3.12.4", ">=1.8.0,<2.0.0")
+    # Maps package name to version constraint string
+    # (e.g., ">=3.12.4", ">=1.8.0,<2.0.0")
     dependency_versions: dict[str, str] = field(default_factory=dict)
 
     @classmethod
@@ -145,16 +146,22 @@ class PackageXML:
                     if constraint:
                         # If package already has a constraint, combine them
                         if pkg_name in version_map:
-                            version_map[pkg_name] = f"{version_map[pkg_name]},{constraint}"
+                            version_map[pkg_name] = (
+                                f"{version_map[pkg_name]},{constraint}"
+                            )
                         else:
                             version_map[pkg_name] = constraint
             return deps
 
         # Parse all dependency types and collect version constraints
         dependency_versions: dict[str, str] = {}
-        buildtool_depends = get_deps_with_versions("buildtool_depend", dependency_versions)
+        buildtool_depends = get_deps_with_versions(
+            "buildtool_depend", dependency_versions
+        )
         build_depends = get_deps_with_versions("build_depend", dependency_versions)
-        build_export_depends = get_deps_with_versions("build_export_depend", dependency_versions)
+        build_export_depends = get_deps_with_versions(
+            "build_export_depend", dependency_versions
+        )
         exec_depends = get_deps_with_versions("exec_depend", dependency_versions)
         test_depends = get_deps_with_versions("test_depend", dependency_versions)
         depends = get_deps_with_versions("depend", dependency_versions)
