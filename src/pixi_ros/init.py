@@ -254,8 +254,8 @@ def _ensure_workspace_section(
     if "channels" not in workspace:
         workspace["channels"] = []
 
-    # Set platforms if not present or if platforms were provided
-    if "platforms" not in workspace or platforms:
+    # Set or extend platforms
+    if "platforms" not in workspace:
         if platforms:
             # Platforms are already in pixi format (linux-64, osx-64, etc.)
             workspace["platforms"] = platforms
@@ -263,6 +263,18 @@ def _ensure_workspace_section(
             # Only add the current platform by default
             current_platform = str(Platform.current())
             workspace["platforms"] = [current_platform]
+    elif platforms:
+        # Extend existing platforms list with new ones (avoiding duplicates)
+        existing_platforms = workspace["platforms"]
+        if not isinstance(existing_platforms, list):
+            existing_platforms = [existing_platforms]
+
+        # Add new platforms that aren't already in the list
+        for platform in platforms:
+            if platform not in existing_platforms:
+                existing_platforms.append(platform)
+
+        workspace["platforms"] = existing_platforms
 
 
 def _ensure_channels(config: dict, distro: str):
@@ -700,14 +712,31 @@ def _ensure_tasks(config: dict):
 
     # Define common ROS tasks if not present
     default_tasks = {
-        "build": "colcon build",
-        "test": "colcon test",
-        "clean": "rm -rf build install log",
+        "build": {
+            "cmd": "colcon build",
+            "description": "Build the ROS workspace",
+        },
+        "build-no-error": {
+            "cmd": "colcon build --continue-on-error --cmake-args -DCMAKE_CXX_FLAGS=\"-Wno-error\"",
+            "description": "Build the workspace ignoring errors and warnings",
+        },
+        "test": {
+            "cmd": "colcon test",
+            "description": "Run tests for the workspace",
+        },
+        "clean": {
+            "cmd": "rm -rf build install log",
+            "description": "Clean build artifacts (build, install, log directories)",
+        },
     }
 
-    for task_name, task_cmd in default_tasks.items():
+    for task_name, task_config in default_tasks.items():
         if task_name not in tasks:
-            tasks[task_name] = task_cmd
+            # Create inline table for task configuration
+            task_table = tomlkit.inline_table()
+            task_table["cmd"] = task_config["cmd"]
+            task_table["description"] = task_config["description"]
+            tasks[task_name] = task_table
 
     config["tasks"] = tasks
 

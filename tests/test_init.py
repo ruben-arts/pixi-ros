@@ -364,3 +364,139 @@ def test_unix_target_for_linux_and_osx_deps():
             linux_deps = config["target"]["linux"]["dependencies"]
             # GL packages specific to Linux
             assert any("libgl-devel" in str(dep).lower() or "libopengl-devel" in str(dep).lower() for dep in linux_deps.keys())
+
+
+def test_tasks_have_descriptions():
+    """Test that generated tasks include descriptions."""
+    from pixi_ros.init import init_workspace
+
+    with TemporaryDirectory() as tmpdir:
+        workspace_path = Path(tmpdir)
+        src_dir = workspace_path / "src"
+        src_dir.mkdir()
+
+        # Create a simple package.xml
+        pkg_xml = src_dir / "package.xml"
+        pkg_xml.write_text("""<?xml version="1.0"?>
+<package format="2">
+    <name>test_pkg</name>
+    <version>0.0.1</version>
+    <description>Test</description>
+    <maintainer email="test@test.com">Test</maintainer>
+    <license>MIT</license>
+</package>
+""")
+
+        # Initialize workspace
+        init_workspace("humble", workspace_path, platforms=["linux-64"])
+
+        # Check pixi.toml was created
+        toml_path = workspace_path / "pixi.toml"
+        assert toml_path.exists()
+
+        # Parse and check tasks
+        import tomlkit
+        with open(toml_path) as f:
+            config = tomlkit.load(f)
+
+        assert "tasks" in config
+        tasks = config["tasks"]
+
+        # Check that expected tasks exist and have descriptions
+        expected_tasks = {
+            "build": {
+                "cmd": "colcon build",
+                "description": "Build the ROS workspace",
+            },
+            "build-no-error": {
+                "cmd": "colcon build --continue-on-error --cmake-args -DCMAKE_CXX_FLAGS=\"-Wno-error\"",
+                "description": "Build the workspace ignoring errors and warnings",
+            },
+            "test": {
+                "cmd": "colcon test",
+                "description": "Run tests for the workspace",
+            },
+            "clean": {
+                "cmd": "rm -rf build install log",
+                "description": "Clean build artifacts (build, install, log directories)",
+            },
+        }
+
+        for task_name, expected_config in expected_tasks.items():
+            assert task_name in tasks, f"Task '{task_name}' not found in pixi.toml"
+            task = tasks[task_name]
+
+            # Task should be a dict/table with cmd and description
+            assert isinstance(task, dict), f"Task '{task_name}' should be a dictionary"
+            assert "cmd" in task, f"Task '{task_name}' missing 'cmd' field"
+            assert "description" in task, f"Task '{task_name}' missing 'description' field"
+
+            # Verify the content matches
+            assert task["cmd"] == expected_config["cmd"], f"Task '{task_name}' has wrong command"
+            assert task["description"] == expected_config["description"], f"Task '{task_name}' has wrong description"
+
+
+def test_platforms_extended_not_overridden():
+    """Test that running init multiple times extends the platforms list instead of overriding it."""
+    from pixi_ros.init import init_workspace
+
+    with TemporaryDirectory() as tmpdir:
+        workspace_path = Path(tmpdir)
+        src_dir = workspace_path / "src"
+        src_dir.mkdir()
+
+        # Create a simple package.xml
+        pkg_xml = src_dir / "package.xml"
+        pkg_xml.write_text("""<?xml version="1.0"?>
+<package format="2">
+    <name>test_pkg</name>
+    <version>0.0.1</version>
+    <description>Test</description>
+    <maintainer email="test@test.com">Test</maintainer>
+    <license>MIT</license>
+</package>
+""")
+
+        # Initialize with single platform
+        init_workspace("humble", workspace_path, platforms=["linux-64"])
+
+        # Check pixi.toml was created with linux-64
+        toml_path = workspace_path / "pixi.toml"
+        assert toml_path.exists()
+
+        import tomlkit
+        with open(toml_path) as f:
+            config = tomlkit.load(f)
+
+        assert "workspace" in config
+        assert "platforms" in config["workspace"]
+        assert config["workspace"]["platforms"] == ["linux-64"]
+
+        # Initialize again with additional platforms
+        init_workspace("humble", workspace_path, platforms=["osx-arm64", "win-64"])
+
+        # Read updated config
+        with open(toml_path) as f:
+            config = tomlkit.load(f)
+
+        # Verify all platforms are present
+        platforms = config["workspace"]["platforms"]
+        assert "linux-64" in platforms, "Original platform should still be present"
+        assert "osx-arm64" in platforms, "New platform osx-arm64 should be added"
+        assert "win-64" in platforms, "New platform win-64 should be added"
+        assert len(platforms) == 3, "Should have exactly 3 platforms"
+
+        # Verify no duplicates if we run init again with overlapping platforms
+        init_workspace("humble", workspace_path, platforms=["linux-64", "osx-64"])
+
+        with open(toml_path) as f:
+            config = tomlkit.load(f)
+
+        platforms = config["workspace"]["platforms"]
+        # linux-64 should not be duplicated
+        assert platforms.count("linux-64") == 1, "linux-64 should not be duplicated"
+        # osx-64 should be added (new)
+        assert "osx-64" in platforms, "New platform osx-64 should be added"
+        # All previous platforms should still be there
+        assert "osx-arm64" in platforms
+        assert "win-64" in platforms
