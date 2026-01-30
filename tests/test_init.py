@@ -408,10 +408,6 @@ def test_tasks_have_descriptions():
                 "cmd": "colcon build",
                 "description": "Build the ROS workspace",
             },
-            "build-no-error": {
-                "cmd": "colcon build --continue-on-error --cmake-args -DCMAKE_CXX_FLAGS=\"-Wno-error\"",
-                "description": "Build the workspace ignoring errors and warnings",
-            },
             "test": {
                 "cmd": "colcon test",
                 "description": "Run tests for the workspace",

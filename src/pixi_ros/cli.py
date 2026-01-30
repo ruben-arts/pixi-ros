@@ -32,7 +32,7 @@ def init(
         typer.Option(
             "--platform",
             "-p",
-            help="Target platforms (e.g., linux-64, osx-arm64, win-64)." \
+            help="Target platforms (e.g., linux-64, osx-arm64, win-64)."
             " Can be specified multiple times.",
         ),
     ] = None,
@@ -104,8 +104,8 @@ def init(
                     platforms.append(available_platforms[sel_num - 1])
                 else:
                     typer.echo(
-                        f"Error: Invalid selection {sel_num}." +
-                        f"Please choose 1-{len(available_platforms)}",
+                        f"Error: Invalid selection {sel_num}."
+                        + f"Please choose 1-{len(available_platforms)}",
                         err=True,
                     )
                     raise typer.Exit(code=1)
