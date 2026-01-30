@@ -377,6 +377,26 @@ def _ensure_dependencies(
         if cmake_version:
             dep_versions["cmake"] = cmake_version
 
+        # Collect version constraints from package.xml
+        for ros_dep, version_constraint in pkg.dependency_versions.items():
+            # Skip workspace packages
+            if ros_dep in workspace_pkg_names:
+                continue
+
+            # Map ROS package to conda packages
+            # Note: We use the first platform for mapping since version constraints
+            # should be the same across platforms for a given ROS package
+            conda_packages = map_ros_to_conda(ros_dep, distro)
+
+            # Apply version constraint to all mapped conda packages
+            for conda_dep in conda_packages:
+                if conda_dep and not conda_dep.startswith("REQUIRE_"):
+                    # If package already has a constraint, combine them
+                    if conda_dep in dep_versions:
+                        dep_versions[conda_dep] = f"{dep_versions[conda_dep]},{version_constraint}"
+                    else:
+                        dep_versions[conda_dep] = version_constraint
+
     # Platforms come from CLI as pixi platform names (linux-64, osx-64, etc.)
     # Map them to mapping platform names for querying the mapping files
     pixi_to_mapping = {

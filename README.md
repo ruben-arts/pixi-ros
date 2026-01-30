@@ -101,6 +101,41 @@ ros-humble-rclcpp = "*"
 ros-humble-std-msgs = "*"
 ```
 
+### Version Constraints
+
+`pixi-ros` supports version constraints from `package.xml` files and automatically applies them to the generated `pixi.toml`.
+
+#### Supported Version Attributes
+
+You can specify version requirements in your `package.xml` using standard ROS version attributes:
+
+| package.xml attribute | pixi.toml constraint | Description |
+|----------------------|----------------------|-------------|
+| `version_eq="X.Y.Z"` | `==X.Y.Z` | Exactly version X.Y.Z |
+| `version_gte="X.Y.Z"` | `>=X.Y.Z` | Version X.Y.Z or newer |
+| `version_gt="X.Y.Z"` | `>X.Y.Z` | Newer than version X.Y.Z |
+| `version_lte="X.Y.Z"` | `<=X.Y.Z` | Version X.Y.Z or older |
+| `version_lt="X.Y.Z"` | `<X.Y.Z` | Older than version X.Y.Z |
+
+Multiple constraints can be combined on the same dependency and will be joined with commas in the output.
+
+Given a `package.xml` with version constraints:
+
+```xml
+<depend version_gte="3.12.4">cmake</depend>
+<build_depend version_gte="3.3.0" version_lt="4.0.0">eigen</build_depend>
+<exec_depend version_eq="1.2.3">boost</exec_depend>
+```
+
+`pixi-ros init` generates:
+
+```toml
+[dependencies]
+cmake = ">=3.12.4"
+eigen = ">=3.3.0,<4.0.0"
+boost = "==1.2.3"
+```
+
 ## Supported ROS Distributions
 
 - ROS 2 Humble: https://prefix.dev/robostack-humble
@@ -128,8 +163,9 @@ pixi-ros init
 
 **What it does:**
 - Scans workspace for `package.xml` files
-- Reads all dependency types (build, exec, test)
+- Reads all dependency types (build, exec, test) and version constraints
 - Maps ROS dependencies to conda packages for each platform
+- Applies version constraints from package.xml to pixi.toml dependencies
 - Configures robostack channels
 - Checks package availability per platform
 - Creates build tasks using colcon

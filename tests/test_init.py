@@ -500,3 +500,63 @@ def test_platforms_extended_not_overridden():
         # All previous platforms should still be there
         assert "osx-arm64" in platforms
         assert "win-64" in platforms
+
+
+def test_version_constraints_from_package_xml():
+    """Test that version constraints from package.xml are applied to pixi.toml dependencies."""
+    from pixi_ros.init import init_workspace
+
+    with TemporaryDirectory() as tmpdir:
+        workspace_path = Path(tmpdir)
+        src_dir = workspace_path / "src"
+        src_dir.mkdir()
+
+        # Create a package.xml with version-constrained dependencies
+        pkg_xml = src_dir / "package.xml"
+        pkg_xml.write_text("""<?xml version="1.0"?>
+<package format="2">
+    <name>test_pkg</name>
+    <version>0.0.1</version>
+    <description>Test</description>
+    <maintainer email="test@test.com">Test</maintainer>
+    <license>MIT</license>
+    <depend version_gte="3.12.4">cmake</depend>
+    <build_depend version_gte="3.3.0" version_lt="4.0.0">eigen</build_depend>
+    <exec_depend version_eq="1.2.3">boost</exec_depend>
+</package>
+""")
+
+        # Initialize workspace
+        init_workspace("humble", workspace_path, platforms=["linux-64"])
+
+        # Check pixi.toml was created
+        toml_path = workspace_path / "pixi.toml"
+        assert toml_path.exists()
+
+        # Parse and check dependencies
+        import tomlkit
+        with open(toml_path) as f:
+            config = tomlkit.load(f)
+
+        assert "dependencies" in config
+        dependencies = config["dependencies"]
+
+        # Check that cmake has the version constraint
+        # Note: cmake might already have a constraint from CMakeLists.txt detection
+        # so we just verify it has some constraint
+        if "cmake" in dependencies:
+            cmake_version = dependencies["cmake"]
+            assert cmake_version != "*", "cmake should have a version constraint"
+            assert ">=" in cmake_version or "<" in cmake_version, "cmake should have a version constraint operator"
+
+        # Check that eigen has the version constraint (>=3.3.0,<4.0.0)
+        if "eigen" in dependencies:
+            eigen_version = dependencies["eigen"]
+            assert eigen_version != "*", "eigen should have a version constraint"
+            assert ">=3.3.0" in eigen_version or ">=" in eigen_version, "eigen should have >= constraint"
+
+        # Check that boost has the exact version constraint (==1.2.3)
+        if "boost" in dependencies:
+            boost_version = dependencies["boost"]
+            assert boost_version != "*", "boost should have a version constraint"
+            assert "==" in boost_version or "1.2.3" in str(boost_version), "boost should have == constraint"

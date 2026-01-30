@@ -236,3 +236,95 @@ def test_parse_missing_required_fields():
             PackageXML.from_file(temp_path)
     finally:
         temp_path.unlink()
+
+
+def test_parse_version_constraints():
+    """Test that version constraints are correctly parsed from package.xml."""
+    from tempfile import NamedTemporaryFile
+
+    with NamedTemporaryFile(mode="w", suffix=".xml", delete=False) as f:
+        f.write(
+            """<?xml version="1.0"?>
+        <package format="3">
+            <name>test_pkg</name>
+            <version>1.0.0</version>
+            <description>Test package</description>
+            <maintainer email="test@test.com">Test</maintainer>
+            <license>MIT</license>
+            <depend version_gte="3.12.4">cmake</depend>
+            <build_depend version_gte="3.3.0" version_lt="4.0.0">eigen</build_depend>
+            <exec_depend version_eq="1.2.3">boost</exec_depend>
+            <depend version_lte="2.0.0">pkg_without_constraint</depend>
+            <depend>pkg_without_any_version</depend>
+        </package>
+        """
+        )
+        f.flush()
+        temp_path = Path(f.name)
+
+    try:
+        pkg = PackageXML.from_file(temp_path)
+
+        # Check that version constraints are stored
+        assert "cmake" in pkg.dependency_versions
+        assert pkg.dependency_versions["cmake"] == ">=3.12.4"
+
+        assert "eigen" in pkg.dependency_versions
+        # Multiple constraints should be combined with comma
+        assert ">=3.3.0" in pkg.dependency_versions["eigen"]
+        assert "<4.0.0" in pkg.dependency_versions["eigen"]
+        assert "," in pkg.dependency_versions["eigen"]
+
+        assert "boost" in pkg.dependency_versions
+        assert pkg.dependency_versions["boost"] == "==1.2.3"
+
+        assert "pkg_without_constraint" in pkg.dependency_versions
+        assert pkg.dependency_versions["pkg_without_constraint"] == "<=2.0.0"
+
+        # Package without version constraint should not be in the map
+        assert "pkg_without_any_version" not in pkg.dependency_versions
+
+        # Check that packages are still in their respective dependency lists
+        assert "cmake" in pkg.depends
+        assert "eigen" in pkg.build_depends
+        assert "boost" in pkg.exec_depends
+        assert "pkg_without_constraint" in pkg.depends
+        assert "pkg_without_any_version" in pkg.depends
+    finally:
+        temp_path.unlink()
+
+
+def test_parse_all_version_constraint_types():
+    """Test parsing all types of version constraints."""
+    from tempfile import NamedTemporaryFile
+
+    with NamedTemporaryFile(mode="w", suffix=".xml", delete=False) as f:
+        f.write(
+            """<?xml version="1.0"?>
+        <package format="3">
+            <name>test_pkg</name>
+            <version>1.0.0</version>
+            <description>Test package</description>
+            <maintainer email="test@test.com">Test</maintainer>
+            <license>MIT</license>
+            <depend version_lt="2.0.0">pkg_lt</depend>
+            <depend version_lte="2.5.0">pkg_lte</depend>
+            <depend version_eq="1.2.3">pkg_eq</depend>
+            <depend version_gte="1.0.0">pkg_gte</depend>
+            <depend version_gt="0.5.0">pkg_gt</depend>
+        </package>
+        """
+        )
+        f.flush()
+        temp_path = Path(f.name)
+
+    try:
+        pkg = PackageXML.from_file(temp_path)
+
+        assert pkg.dependency_versions["pkg_lt"] == "<2.0.0"
+        assert pkg.dependency_versions["pkg_lte"] == "<=2.5.0"
+        assert pkg.dependency_versions["pkg_eq"] == "==1.2.3"
+        assert pkg.dependency_versions["pkg_gte"] == ">=1.0.0"
+        assert pkg.dependency_versions["pkg_gt"] == ">0.5.0"
+    finally:
+        temp_path.unlink()

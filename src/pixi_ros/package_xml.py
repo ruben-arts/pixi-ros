@@ -33,6 +33,10 @@ class PackageXML:
     # Generic depends (shorthand for build, export, and exec)
     depends: list[str] = field(default_factory=list)
 
+    # Version constraints for dependencies
+    # Maps package name to version constraint string (e.g., ">=3.12.4", ">=1.8.0,<2.0.0")
+    dependency_versions: dict[str, str] = field(default_factory=dict)
+
     @classmethod
     def from_file(cls, path: Path) -> "PackageXML":
         """
@@ -90,6 +94,36 @@ class PackageXML:
                 build_type = build_type_elem.text
 
         # Extract dependencies
+        def parse_version_constraint(elem) -> str | None:
+            """
+            Parse version constraint attributes from a dependency element.
+
+            Converts ROS package.xml version attributes to conda/pixi constraint syntax:
+            - version_lt="X" → <X
+            - version_lte="X" → <=X
+            - version_eq="X" → ==X
+            - version_gte="X" → >=X
+            - version_gt="X" → >X
+
+            Multiple constraints are combined with commas.
+            """
+            constraints = []
+
+            version_attrs = [
+                ("version_lt", "<"),
+                ("version_lte", "<="),
+                ("version_eq", "=="),
+                ("version_gte", ">="),
+                ("version_gt", ">"),
+            ]
+
+            for attr, op in version_attrs:
+                value = elem.get(attr)
+                if value:
+                    constraints.append(f"{op}{value}")
+
+            return ",".join(constraints) if constraints else None
+
         def get_deps(tag: str) -> list[str]:
             """Extract all dependencies with the given tag."""
             deps = []
@@ -98,16 +132,35 @@ class PackageXML:
                     deps.append(elem.text.strip())
             return deps
 
-        # Parse all dependency types
-        buildtool_depends = get_deps("buildtool_depend")
-        build_depends = get_deps("build_depend")
-        build_export_depends = get_deps("build_export_depend")
-        exec_depends = get_deps("exec_depend")
-        test_depends = get_deps("test_depend")
-        depends = get_deps("depend")
+        def get_deps_with_versions(tag: str, version_map: dict[str, str]) -> list[str]:
+            """Extract dependencies and populate version constraints."""
+            deps = []
+            for elem in root.findall(tag):
+                if elem.text:
+                    pkg_name = elem.text.strip()
+                    deps.append(pkg_name)
+
+                    # Parse version constraint if present
+                    constraint = parse_version_constraint(elem)
+                    if constraint:
+                        # If package already has a constraint, combine them
+                        if pkg_name in version_map:
+                            version_map[pkg_name] = f"{version_map[pkg_name]},{constraint}"
+                        else:
+                            version_map[pkg_name] = constraint
+            return deps
+
+        # Parse all dependency types and collect version constraints
+        dependency_versions: dict[str, str] = {}
+        buildtool_depends = get_deps_with_versions("buildtool_depend", dependency_versions)
+        build_depends = get_deps_with_versions("build_depend", dependency_versions)
+        build_export_depends = get_deps_with_versions("build_export_depend", dependency_versions)
+        exec_depends = get_deps_with_versions("exec_depend", dependency_versions)
+        test_depends = get_deps_with_versions("test_depend", dependency_versions)
+        depends = get_deps_with_versions("depend", dependency_versions)
 
         # Format 2 compatibility
-        run_depends = get_deps("run_depend")
+        run_depends = get_deps_with_versions("run_depend", dependency_versions)
 
         return cls(
             name=name_elem.text.strip(),
@@ -126,6 +179,7 @@ class PackageXML:
             test_depends=test_depends,
             run_depends=run_depends,
             depends=depends,
+            dependency_versions=dependency_versions,
         )
 
     def get_all_build_dependencies(self) -> list[str]:

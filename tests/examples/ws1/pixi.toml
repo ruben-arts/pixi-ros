@@ -1,37 +1,36 @@
 [workspace]
 name = "ws1"
 channels = ["https://prefix.dev/robostack-jazzy", "https://prefix.dev/conda-forge"]
-platforms = ["osx-arm64"]
+platforms = ["linux-64"]
 
 [dependencies]
 # Base ROS dependencies
 ros-jazzy-ros-base = "*"
+pkg-config = "*"
+compilers = "*"
+make = "*"
+ninja = "*"
 ros-jazzy-ros2cli = "*"
 
 # Build tools
 colcon-common-extensions = "*"
 cmake = "<4"
 
-# From package: package-a
-ros-jazzy-ament-cmake = "*"
-ros-jazzy-ament-lint-auto = "*"
-ros-jazzy-ament-lint-common = "*"
-
-# From package: package-b
+# Workspace dependencies
 numpy = "*"
 pytest = "*"
+ros-jazzy-ament-cmake = "*"
 ros-jazzy-ament-copyright = "*"
 ros-jazzy-ament-flake8 = "*"
+ros-jazzy-ament-lint-auto = ">=1.2.3,>=1.2.3"
+ros-jazzy-ament-lint-common = "==1.0.0,==1.0.0"
 ros-jazzy-ament-pep257 = "*"
 
 [tasks]
-build = "colcon build"
-test = "colcon test"
-clean = "rm -rf build install log"
-
-[tool.pytest.ini_options]
-python_files = ["test_*.py"]
-python_functions = ["test_*"]
+build = {cmd = "colcon build", description = "Build the ROS workspace"}
+build-no-error = {cmd = "colcon build --continue-on-error --cmake-args -DCMAKE_CXX_FLAGS=\"-Wno-error\"", description = "Build the workspace ignoring errors and warnings"}
+test = {cmd = "colcon test", description = "Run tests for the workspace"}
+clean = {cmd = "rm -rf build install log", description = "Clean build artifacts (build, install, log directories)"}
 
 # Scripts to source on environment activation, found after first colcon build.
 
