@@ -3,7 +3,6 @@
 import asyncio
 from dataclasses import dataclass
 from enum import Enum
-from functools import lru_cache
 
 from rattler import Channel, Gateway, Platform
 from rosdistro import get_cached_distribution, get_index, get_index_url
@@ -42,6 +41,7 @@ class RosDistroValidator:
         self.distro_name = distro_name
         self._distro = None
         self._init_error = None
+        self._conda_forge_cache: dict[tuple[str, str], bool] = {}
 
         try:
             index = get_index(get_index_url())
@@ -63,10 +63,7 @@ class RosDistroValidator:
             return False
         return package_name in self._distro.release_packages
 
-    @lru_cache(maxsize=128)
-    def check_conda_forge_availability(
-        self, package_name: str, platform: str
-    ) -> bool:
+    def check_conda_forge_availability(self, package_name: str, platform: str) -> bool:
         """
         Check if package is available on conda-forge.
 
@@ -77,6 +74,11 @@ class RosDistroValidator:
         Returns:
             True if package is available on conda-forge
         """
+        # Check cache first
+        cache_key = (package_name, platform)
+        if cache_key in self._conda_forge_cache:
+            return self._conda_forge_cache[cache_key]
+
         try:
             gateway = Gateway()
             channel = Channel("https://prefix.dev/conda-forge")
@@ -98,11 +100,14 @@ class RosDistroValidator:
             for channel_records in results:
                 for record in channel_records:
                     if record.name.normalized == package_name.lower():
+                        self._conda_forge_cache[cache_key] = True
                         return True
 
+            self._conda_forge_cache[cache_key] = False
             return False
         except (asyncio.TimeoutError, Exception):
             # On error or timeout, assume not available
+            self._conda_forge_cache[cache_key] = False
             return False
 
     def validate_package(
