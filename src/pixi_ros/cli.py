@@ -7,6 +7,8 @@ import typer
 from pixi_ros.init import init_workspace
 from pixi_ros.mappings import get_platforms, get_ros_distros
 
+from rattler import Platform
+
 app = typer.Typer(
     name="pixi-ros",
     help="Pixi extension for ROS package management",
@@ -77,6 +79,7 @@ def init(
     # If platforms not provided, prompt user to select
     if platforms is None or len(platforms) == 0:
         available_platforms = get_platforms()
+        current_platform = Platform.current()
         typer.echo("\nAvailable target platforms:")
         for i, p in enumerate(available_platforms, 1):
             typer.echo(f"  {i}. {p}")
@@ -85,6 +88,7 @@ def init(
         selection = typer.prompt(
             "\nSelect platforms (enter numbers or names, comma or space separated)",
             type=str,
+            default=str(current_platform),
         )
 
         # Parse selection (can be numbers or names, comma or space separated)
@@ -92,35 +96,40 @@ def init(
         # Split by comma or space
         selections = selection.replace(",", " ").split()
 
-        for sel in selections:
-            sel = sel.strip()
-            if not sel:
-                continue
+        # If nothing is selected, default to current platform
+        if not selections:
+            typer.echo(f"No platforms selected, defaulting to current platform: {current_platform}.")
+            platforms.append(str(current_platform))
+        else:
+            for sel in selections:
+                sel = sel.strip()
+                if not sel:
+                    continue
 
-            try:
-                # Try parsing as number
-                sel_num = int(sel)
-                if 1 <= sel_num <= len(available_platforms):
-                    platforms.append(available_platforms[sel_num - 1])
-                else:
-                    typer.echo(
-                        f"Error: Invalid selection {sel_num}."
-                        + f"Please choose 1-{len(available_platforms)}",
-                        err=True,
-                    )
-                    raise typer.Exit(code=1)
-            except ValueError as err:
-                # User entered a name instead of number
-                if sel in available_platforms:
-                    platforms.append(sel)
-                else:
-                    typer.echo(f"Error: '{sel}' is not a valid platform", err=True)
-                    typer.echo(f"Available: {', '.join(available_platforms)}", err=True)
-                    raise typer.Exit(code=1) from err
+                try:
+                    # Try parsing as number
+                    sel_num = int(sel)
+                    if 1 <= sel_num <= len(available_platforms):
+                        platforms.append(available_platforms[sel_num - 1])
+                    else:
+                        typer.echo(
+                            f"Error: Invalid selection {sel_num}."
+                            + f"Please choose 1-{len(available_platforms)}",
+                            err=True,
+                        )
+                        raise typer.Exit(code=1)
+                except ValueError as err:
+                    # User entered a name instead of number
+                    if sel in available_platforms:
+                        platforms.append(sel)
+                    else:
+                        typer.echo(f"Error: '{sel}' is not a valid platform", err=True)
+                        typer.echo(f"Available: {', '.join(available_platforms)}", err=True)
+                        raise typer.Exit(code=1) from err
 
-        if not platforms:
-            typer.echo("Error: No platforms selected", err=True)
-            raise typer.Exit(code=1)
+            if not platforms:
+                typer.echo("Error: No platforms selected", err=True)
+                raise typer.Exit(code=1)
 
     init_workspace(distro, platforms=platforms)
 

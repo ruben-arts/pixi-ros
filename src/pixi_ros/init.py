@@ -14,7 +14,6 @@ from pixi_ros.mappings import (
     expand_gl_requirements,
     get_mappings,
     map_ros_to_conda,
-    validate_distro,
 )
 from pixi_ros.utils import detect_cmake_version_requirement
 from pixi_ros.validator import PackageSource, RosDistroValidator
@@ -42,12 +41,6 @@ def init_workspace(
     Raises:
         typer.Exit: If validation fails or workspace not found
     """
-    # Validate distro
-    if not validate_distro(distro):
-        typer.echo(f"Error: Unsupported ROS distribution '{distro}'", err=True)
-        typer.echo("Supported distros: humble, iron, jazzy, rolling", err=True)
-        raise typer.Exit(code=1)
-
     # Find workspace root
     if workspace_path is None:
         workspace_path = find_workspace_root()
