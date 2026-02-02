@@ -12,6 +12,8 @@
   <test_depend version_gte="1.2.3">ament_lint_auto</test_depend>
   <test_depend version_eq="1.0.0">ament_lint_common</test_depend>
 
+  <depend>package-b</depend>
+
   <export>
     <build_type>ament_cmake</build_type>
   </export>

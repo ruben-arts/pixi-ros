@@ -10,8 +10,9 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
-from pixi_ros.mappings import expand_gl_requirements, map_ros_to_conda, validate_distro
+from pixi_ros.mappings import expand_gl_requirements, get_mappings, map_ros_to_conda, validate_distro
 from pixi_ros.utils import detect_cmake_version_requirement
+from pixi_ros.validator import PackageSource, RosDistroValidator
 from pixi_ros.workspace import discover_packages, find_workspace_root
 
 console = Console()
@@ -74,6 +75,17 @@ def init_workspace(
         package_names = ", ".join(p.name for p in packages)
         typer.echo(f"Found {len(packages)} package(s): {package_names}")
 
+    # Create validator for package validation
+    typer.echo(f"Initializing ROS {distro} distribution validator...")
+    validator = RosDistroValidator(distro)
+    if validator._init_error:
+        typer.echo(
+            f"Warning: Could not initialize ROS distro validator: {validator._init_error}",
+            err=True,
+        )
+        typer.echo("Continuing with fallback package resolution...", err=True)
+        validator = None
+
     # Load or create pixi.toml
     pixi_toml_path = workspace_path / "pixi.toml"
     if pixi_toml_path.exists():
@@ -89,12 +101,12 @@ def init_workspace(
         pixi_config = tomlkit.document()
 
     # Display discovered dependencies
-    _display_dependencies(packages, distro)
+    _display_dependencies(packages, distro, validator)
 
     # Update configuration
     _ensure_workspace_section(pixi_config, workspace_path, platforms)
     _ensure_channels(pixi_config, distro)
-    _ensure_dependencies(pixi_config, packages, distro, platforms)
+    _ensure_dependencies(pixi_config, packages, distro, platforms, validator)
     _ensure_tasks(pixi_config)
     _ensure_activation(pixi_config)
 
@@ -153,16 +165,25 @@ def init_workspace(
         raise typer.Exit(code=1) from e
 
 
-def _display_dependencies(packages, distro: str):
+def _display_dependencies(packages, distro: str, validator=None):
     """Display discovered dependencies in a rich table."""
     if not packages:
         return
 
     workspace_pkg_names = {pkg.name for pkg in packages}
 
+    # Track validation stats if validator is available
+    validation_stats = {
+        "workspace": 0,
+        "mapping": 0,
+        "ros_distro": 0,
+        "conda_forge": 0,
+        "not_found": 0,
+    }
+
     # Collect dependencies organized by ROS package and type
-    # Structure: {pkg_name: {dep_type: {ros_dep: [conda_packages]}}}
-    pkg_deps: dict[str, dict[str, dict[str, list[str]]]] = {}
+    # Structure: {pkg_name: {dep_type: {ros_dep: (conda_packages, source)}}}
+    pkg_deps: dict[str, dict[str, dict[str, tuple[list[str], str]]]] = {}
 
     for pkg in packages:
         pkg_deps[pkg.name] = {"Build": {}, "Runtime": {}, "Test": {}}
@@ -170,26 +191,107 @@ def _display_dependencies(packages, distro: str):
         # Build dependencies
         for ros_dep in pkg.get_all_build_dependencies():
             if ros_dep in workspace_pkg_names:
+                validation_stats["workspace"] += 1
                 continue
-            conda_packages = map_ros_to_conda(ros_dep, distro)
+
+            # Track validation source if validator is available
+            source_label = "Fallback"
+            if validator:
+                mappings = get_mappings()
+                result = validator.validate_package(
+                    ros_dep, workspace_pkg_names, mappings, str(Platform.current())
+                )
+                if result.source == PackageSource.WORKSPACE:
+                    validation_stats["workspace"] += 1
+                    source_label = "[dim]Workspace[/dim]"
+                elif result.source == PackageSource.MAPPING:
+                    validation_stats["mapping"] += 1
+                    source_label = "[cyan]Mapping[/cyan]"
+                elif result.source == PackageSource.ROS_DISTRO:
+                    validation_stats["ros_distro"] += 1
+                    source_label = f"[green]ROS {distro}[/green]"
+                elif result.source == PackageSource.CONDA_FORGE:
+                    validation_stats["conda_forge"] += 1
+                    source_label = "[blue]conda-forge[/blue]"
+                elif result.source == PackageSource.NOT_FOUND:
+                    validation_stats["not_found"] += 1
+                    source_label = "[red]NOT FOUND[/red]"
+
+            conda_packages = map_ros_to_conda(
+                ros_dep, distro, validator=validator, workspace_packages=workspace_pkg_names
+            )
             if conda_packages:
-                pkg_deps[pkg.name]["Build"][ros_dep] = conda_packages
+                pkg_deps[pkg.name]["Build"][ros_dep] = (conda_packages, source_label)
 
         # Runtime dependencies
         for ros_dep in pkg.get_all_runtime_dependencies():
             if ros_dep in workspace_pkg_names:
+                validation_stats["workspace"] += 1
                 continue
-            conda_packages = map_ros_to_conda(ros_dep, distro)
+
+            # Track validation source if validator is available
+            source_label = "Fallback"
+            if validator:
+                mappings = get_mappings()
+                result = validator.validate_package(
+                    ros_dep, workspace_pkg_names, mappings, str(Platform.current())
+                )
+                if result.source == PackageSource.WORKSPACE:
+                    validation_stats["workspace"] += 1
+                    source_label = "[dim]Workspace[/dim]"
+                elif result.source == PackageSource.MAPPING:
+                    validation_stats["mapping"] += 1
+                    source_label = "[cyan]Mapping[/cyan]"
+                elif result.source == PackageSource.ROS_DISTRO:
+                    validation_stats["ros_distro"] += 1
+                    source_label = f"[green]ROS {distro}[/green]"
+                elif result.source == PackageSource.CONDA_FORGE:
+                    validation_stats["conda_forge"] += 1
+                    source_label = "[blue]conda-forge[/blue]"
+                elif result.source == PackageSource.NOT_FOUND:
+                    validation_stats["not_found"] += 1
+                    source_label = "[red]NOT FOUND[/red]"
+
+            conda_packages = map_ros_to_conda(
+                ros_dep, distro, validator=validator, workspace_packages=workspace_pkg_names
+            )
             if conda_packages:
-                pkg_deps[pkg.name]["Runtime"][ros_dep] = conda_packages
+                pkg_deps[pkg.name]["Runtime"][ros_dep] = (conda_packages, source_label)
 
         # Test dependencies
         for ros_dep in pkg.get_all_test_dependencies():
             if ros_dep in workspace_pkg_names:
+                validation_stats["workspace"] += 1
                 continue
-            conda_packages = map_ros_to_conda(ros_dep, distro)
+
+            # Track validation source if validator is available
+            source_label = "Fallback"
+            if validator:
+                mappings = get_mappings()
+                result = validator.validate_package(
+                    ros_dep, workspace_pkg_names, mappings, str(Platform.current())
+                )
+                if result.source == PackageSource.WORKSPACE:
+                    validation_stats["workspace"] += 1
+                    source_label = "[dim]Workspace[/dim]"
+                elif result.source == PackageSource.MAPPING:
+                    validation_stats["mapping"] += 1
+                    source_label = "[cyan]Mapping[/cyan]"
+                elif result.source == PackageSource.ROS_DISTRO:
+                    validation_stats["ros_distro"] += 1
+                    source_label = f"[green]ROS {distro}[/green]"
+                elif result.source == PackageSource.CONDA_FORGE:
+                    validation_stats["conda_forge"] += 1
+                    source_label = "[blue]conda-forge[/blue]"
+                elif result.source == PackageSource.NOT_FOUND:
+                    validation_stats["not_found"] += 1
+                    source_label = "[red]NOT FOUND[/red]"
+
+            conda_packages = map_ros_to_conda(
+                ros_dep, distro, validator=validator, workspace_packages=workspace_pkg_names
+            )
             if conda_packages:
-                pkg_deps[pkg.name]["Test"][ros_dep] = conda_packages
+                pkg_deps[pkg.name]["Test"][ros_dep] = (conda_packages, source_label)
 
     # Check if any external dependencies exist
     has_deps = any(
@@ -211,9 +313,15 @@ def _display_dependencies(packages, distro: str):
         all_deps = []
         for dep_type in ["Build", "Runtime", "Test"]:
             for ros_dep in sorted(pkg_info[dep_type].keys()):
-                conda_pkgs = pkg_info[dep_type][ros_dep]
-                conda_str = ", ".join(conda_pkgs)
-                all_deps.append((ros_dep, dep_type, conda_str))
+                dep_info = pkg_info[dep_type][ros_dep]
+                # Handle both tuple format (with source) and list format (backward compat)
+                if isinstance(dep_info, tuple):
+                    conda_pkgs, source = dep_info
+                else:
+                    conda_pkgs = dep_info
+                    source = "Fallback"
+                conda_str = ", ".join(conda_pkgs) if conda_pkgs else "[red]NOT FOUND[/red]"
+                all_deps.append((ros_dep, dep_type, conda_str, source))
 
         # Skip packages with no external dependencies
         if not all_deps:
@@ -228,12 +336,48 @@ def _display_dependencies(packages, distro: str):
         table.add_column("ROS Dependency", style="yellow")
         table.add_column("Type", style="blue")
         table.add_column("Conda Packages", style="green")
+        if validator:
+            table.add_column("Source", style="magenta")
 
         # Add all dependencies for this package
-        for ros_dep, dep_type, conda_str in all_deps:
-            table.add_row(ros_dep, dep_type, conda_str)
+        for dep_data in all_deps:
+            if validator:
+                ros_dep, dep_type, conda_str, source = dep_data
+                table.add_row(ros_dep, dep_type, conda_str, source)
+            else:
+                ros_dep, dep_type, conda_str, _ = dep_data
+                table.add_row(ros_dep, dep_type, conda_str)
 
         console.print(table)
+        console.print("")
+
+    # Display validation summary if validator was used
+    if validator:
+        console.print("\n[bold cyan]Validation Summary:[/bold cyan]")
+        total_deps = sum(validation_stats.values())
+
+        if validation_stats["workspace"] > 0:
+            console.print(
+                f"  [green]✓[/green] {validation_stats['workspace']} workspace packages (skipped)"
+            )
+        if validation_stats["mapping"] > 0:
+            console.print(
+                f"  [green]✓[/green] {validation_stats['mapping']} packages from mappings"
+            )
+        if validation_stats["ros_distro"] > 0:
+            console.print(
+                f"  [green]✓[/green] {validation_stats['ros_distro']} packages from ROS {distro} distro"
+            )
+        if validation_stats["conda_forge"] > 0:
+            console.print(
+                f"  [green]✓[/green] {validation_stats['conda_forge']} packages from conda-forge (auto-detected)"
+            )
+        if validation_stats["not_found"] > 0:
+            console.print(
+                f"  [yellow]⚠[/yellow] {validation_stats['not_found']} packages NOT FOUND (will be commented out)"
+            )
+
+        console.print(f"\n  Total external dependencies: {total_deps - validation_stats['workspace']}")
         console.print("")
 
 
@@ -350,7 +494,7 @@ def _check_package_availability(
 
 
 def _ensure_dependencies(
-    config: dict, packages, distro: str, platforms: list[str] | None = None
+    config: dict, packages, distro: str, platforms: list[str] | None = None, validator=None
 ):
     """
     Ensure all ROS dependencies are present with comments showing source.
@@ -386,7 +530,9 @@ def _ensure_dependencies(
             # Map ROS package to conda packages
             # Note: We use the first platform for mapping since version constraints
             # should be the same across platforms for a given ROS package
-            conda_packages = map_ros_to_conda(ros_dep, distro)
+            conda_packages = map_ros_to_conda(
+                ros_dep, distro, validator=validator, workspace_packages=workspace_pkg_names
+            )
 
             # Apply version constraint to all mapped conda packages
             for conda_dep in conda_packages:
@@ -433,7 +579,11 @@ def _ensure_dependencies(
 
                 # Map to conda packages for this mapping platform
                 conda_packages = map_ros_to_conda(
-                    ros_dep, distro, platform_override=mapping_platform
+                    ros_dep,
+                    distro,
+                    platform_override=mapping_platform,
+                    validator=validator,
+                    workspace_packages=workspace_pkg_names,
                 )
 
                 # Skip if no conda packages were returned
@@ -497,6 +647,9 @@ def _ensure_dependencies(
     # Add base ROS dependencies with comment
     base_deps = {
         f"ros-{distro}-ros-base": "*",
+    }
+
+    build_deps = {
         "pkg-config": "*",
         "compilers": "*",
         "make": "*",
@@ -511,8 +664,14 @@ def _ensure_dependencies(
         if dep not in dependencies:
             dependencies[dep] = version
 
+    for dep, version in build_deps.items():
+        if dep not in dependencies:
+            dependencies[dep] = version
+
     # Add ros2cli packages
-    ros2cli_deps = map_ros_to_conda("ros2cli", distro)
+    ros2cli_deps = map_ros_to_conda(
+        "ros2cli", distro, validator=validator, workspace_packages=workspace_pkg_names
+    )
     if ros2cli_deps:
         for conda_pkg in ros2cli_deps:
             if conda_pkg and conda_pkg not in dependencies:

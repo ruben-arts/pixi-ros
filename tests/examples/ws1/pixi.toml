@@ -1,16 +1,16 @@
 [workspace]
 name = "ws1"
-channels = ["https://prefix.dev/robostack-jazzy", "https://prefix.dev/conda-forge"]
-platforms = ["linux-64"]
+channels = ["https://prefix.dev/robostack-humble", "https://prefix.dev/conda-forge"]
+platforms = ["osx-arm64"]
 
 [dependencies]
 # Base ROS dependencies
-ros-jazzy-ros-base = "*"
+ros-humble-ros-base = "*"
 pkg-config = "*"
 compilers = "*"
 make = "*"
 ninja = "*"
-ros-jazzy-ros2cli = "*"
+ros-humble-ros2cli = "*"
 
 # Build tools
 colcon-common-extensions = "*"
@@ -19,16 +19,15 @@ cmake = "<4"
 # Workspace dependencies
 numpy = "*"
 pytest = "*"
-ros-jazzy-ament-cmake = "*"
-ros-jazzy-ament-copyright = "*"
-ros-jazzy-ament-flake8 = "*"
-ros-jazzy-ament-lint-auto = ">=1.2.3,>=1.2.3"
-ros-jazzy-ament-lint-common = "==1.0.0,==1.0.0"
-ros-jazzy-ament-pep257 = "*"
+ros-humble-ament-cmake = "*"
+ros-humble-ament-copyright = "*"
+ros-humble-ament-flake8 = "*"
+ros-humble-ament-lint-auto = ">=1.2.3,>=1.2.3"
+ros-humble-ament-lint-common = "==1.0.0,==1.0.0"
+ros-humble-ament-pep257 = "*"
 
 [tasks]
 build = {cmd = "colcon build", description = "Build the ROS workspace"}
-build-no-error = {cmd = "colcon build --continue-on-error --cmake-args -DCMAKE_CXX_FLAGS=\"-Wno-error\"", description = "Build the workspace ignoring errors and warnings"}
 test = {cmd = "colcon test", description = "Run tests for the workspace"}
 clean = {cmd = "rm -rf build install log", description = "Clean build artifacts (build, install, log directories)"}
 

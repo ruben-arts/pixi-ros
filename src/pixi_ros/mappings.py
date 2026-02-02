@@ -103,7 +103,11 @@ def reload_mappings():
 
 
 def map_ros_to_conda(
-    ros_package: str, distro: str = "humble", platform_override: str | None = None
+    ros_package: str,
+    distro: str = "humble",
+    platform_override: str | None = None,
+    validator=None,
+    workspace_packages: set[str] | None = None,
 ) -> list[str]:
     """
     Map a ROS package name to its conda package names.
@@ -116,6 +120,8 @@ def map_ros_to_conda(
         ros_package: The ROS package name (e.g., "rclcpp", "udev", "opengl")
         distro: The ROS distribution (e.g., "humble", "iron", "jazzy")
         platform_override: Override platform detection (for testing)
+        validator: Optional RosDistroValidator instance for validation
+        workspace_packages: Optional set of workspace package names
 
     Returns:
         List of conda package names, which may include placeholder strings
@@ -130,6 +136,30 @@ def map_ros_to_conda(
         >>> map_ros_to_conda("opengl", "humble")  # doctest: +SKIP
         ['REQUIRE_OPENGL']  # placeholder from mapping file
     """
+    # If validator is provided, use full validation logic
+    if validator is not None:
+        mappings = get_mappings()
+        ws_packages = workspace_packages or set()
+
+        # Determine the platform to use for validation
+        if platform_override:
+            # Convert mapping platform to pixi platform for validator
+            mapping_to_pixi = {
+                "linux": "linux-64",
+                "osx": "osx-64",
+                "win64": "win-64",
+            }
+            platform = mapping_to_pixi.get(platform_override, "linux-64")
+        else:
+            # Use current platform
+            platform = str(Platform.current())
+
+        result = validator.validate_package(
+            ros_package, ws_packages, mappings, platform
+        )
+        return result.conda_packages
+
+    # Legacy behavior (backward compatibility)
     mappings = get_mappings()
     current_platform = platform_override or _detect_platform()
 

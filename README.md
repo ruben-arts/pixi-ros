@@ -44,10 +44,16 @@ pixi-ros init --distro humble
 This will:
 1. Discover all ROS packages in your workspace (by finding `package.xml` files)
 2. Read dependencies from each `package.xml`
-3. Map ROS package names to conda packages
+3. **Validate and resolve** each dependency using the priority system:
+   - Skip workspace packages (built locally)
+   - Use custom mappings from YAML files
+   - Query ROS distro index for ROS packages
+   - Auto-detect packages on conda-forge
+   - Flag packages that can't be found
 4. Generate/update `pixi.toml` with proper channels and dependencies
-5. Check package availability and warn about missing packages
+5. Check package availability in conda channels for each platform
 6. Create helpful build/test/clean tasks
+7. Display detailed validation results with source information
 
 ### Install and Build
 
@@ -69,26 +75,66 @@ pixi shell
 
 ## How It Works
 
-### Dependency Mapping
+### Dependency Mapping & Validation
 
-`pixi-ros` reads all dependency types from `package.xml` files.
-It then does a best effort mapping of ROS package names to conda packages.
+`pixi-ros` reads all dependency types from `package.xml` files and intelligently resolves them to conda packages using a **priority-based validation system**.
 
-- **ROS packages**: `ros-{distro}-{package}` from robostack channels (e.g., `ros-humble-rclcpp`)
-- **System packages**: Mapped to conda-forge equivalents (e.g., `cmake`, `eigen`)
-- **Platform-specific packages**: Different mappings per platform (e.g., OpenGL → `libgl-devel` on Linux, X11 packages on macOS)
+#### Validation Priority Order
+
+When resolving a ROS package dependency, `pixi-ros` checks sources in this order:
+
+1. **Workspace packages** (local source) → Skipped, won't be added to dependencies
+2. **Mapping files** → Use custom conda package mappings from the embedded mapping.
+3. **ROS distribution** → Query the official ROS distro index for `ros-{distro}-{package}` packages
+4. **conda-forge** (auto-detection) → Search conda-forge for packages without ros-distro prefix
+5. **NOT FOUND** → Mark as unavailable and comment out in `pixi.toml`
+
+#### Package Sources
+
+The dependency tables show where each package comes from:
+
+- **ROS {distro}**: Official ROS distribution packages from robostack (e.g., `ros-humble-rclcpp`)
+- **Mapping**: Custom mappings from YAML files (e.g., `cmake` → `cmake`, `udev` → `libusb + libudev`)
+- **conda-forge**: Auto-detected packages available directly on conda-forge
+- **Workspace**: Local packages in your workspace (skipped from dependencies)
+- **NOT FOUND**: Packages that couldn't be resolved (commented out in `pixi.toml`)
 
 The mapping rules are defined in YAML files (see `src/pixi_ros/data/conda-forge.yaml`) and can be customized by placing your own mapping files in `pixi-ros/*.yaml` or `~/.pixi-ros/*.yaml`.
 
-After the mapping, it validates package availability in the configured channels for each target platform. This starts a connection with `https://prefix.dev` to check if packages exist.
+After dependency resolution, `pixi-ros` validates package availability in the configured channels for each target platform by connecting to `https://prefix.dev`.
 
-### Example
+### Example Output
+
+When you run `pixi-ros init --distro humble`, you'll see validation results:
+
+```
+Found 2 package(s): my_package, other_package
+Initializing ROS humble distribution validator...
+
+╭─────────────────── Package: my_package ───────────────────╮
+│ ROS Dependency │ Type    │ Conda Packages          │ Source       │
+├────────────────┼─────────┼─────────────────────────┼──────────────┤
+│ rclcpp         │ Build   │ ros-humble-rclcpp       │ ROS humble   │
+│ std_msgs       │ Runtime │ ros-humble-std-msgs     │ ROS humble   │
+│ cmake          │ Build   │ cmake                   │ Mapping      │
+│ eigen          │ Build   │ eigen                   │ conda-forge  │
+╰────────────────┴─────────┴─────────────────────────┴──────────────╯
+
+Validation Summary:
+  ✓ 2 workspace packages (skipped)
+  ✓ 1 packages from mappings
+  ✓ 5 packages from ROS humble distro
+  ✓ 1 packages from conda-forge (auto-detected)
+
+  Total external dependencies: 7
+```
 
 Given a `package.xml` with:
 
 ```xml
 <depend>rclcpp</depend>
 <build_depend>ament_cmake</build_depend>
+<build_depend>cmake</build_depend>
 <exec_depend>std_msgs</exec_depend>
 ```
 
@@ -96,9 +142,21 @@ Given a `package.xml` with:
 
 ```toml
 [dependencies]
-ros-humble-ament-cmake = "*"
-ros-humble-rclcpp = "*"
-ros-humble-std-msgs = "*"
+# Base ROS dependencies
+ros-humble-ros-base = "*"
+pkg-config = "*"
+compilers = "*"
+make = "*"
+ninja = "*"
+
+# Build tools
+colcon-common-extensions = "*"
+
+# Workspace dependencies
+cmake = "*"                      # From mapping
+ros-humble-ament-cmake = "*"    # From ROS humble
+ros-humble-rclcpp = "*"         # From ROS humble
+ros-humble-std-msgs = "*"       # From ROS humble
 ```
 
 ### Version Constraints
@@ -164,6 +222,7 @@ pixi-ros init
 **What it does:**
 - Scans workspace for `package.xml` files
 - Reads all dependency types (build, exec, test) and version constraints
+- **Validates dependencies** using the priority-based system (workspace → mapping → ROS distro → conda-forge)
 - Maps ROS dependencies to conda packages for each platform
 - Applies version constraints from package.xml to pixi.toml dependencies
 - Configures robostack channels
@@ -171,6 +230,7 @@ pixi-ros init
 - Creates build tasks using colcon
 - Generates helpful `README_PIXI.md`
 - Sets up platform-specific dependencies in `pixi.toml`
+- **Displays validation results** showing where each dependency was found
 
 **Running multiple times:**
 The command is idempotent - you can run it multiple times to update dependencies as your workspace changes.
@@ -278,12 +338,15 @@ workspace/
 
 ### Package Not Found
 
-If pixi-ros marks packages as "NOT FOUND":
+If pixi-ros marks packages as "NOT FOUND" (shown in red in the validation output):
 
-1. Check if the package exists in robostack: https://prefix.dev/channels/robostack-{distro}
-2. Check for typos in `package.xml`
-3. Some packages may have different names - check mapping files
-4. Consider adding the package to your workspace instead of depending on it
+1. **Check the ROS distro**: Verify the package exists in robostack: https://prefix.dev/channels/robostack-{distro}
+2. **Check for typos**: Review your `package.xml` for spelling errors
+3. **Check conda-forge**: Some packages may be available directly on conda-forge without the `ros-distro-` prefix
+4. **Create a mapping**: Add a custom mapping in `pixi-ros/*.yaml` if the package has a different conda name
+5. **Add to workspace**: Consider including the package source in your workspace instead of depending on it
+
+The validation table shows exactly where each dependency was checked, making it easier to diagnose issues.
 
 ### Different Package Names
 

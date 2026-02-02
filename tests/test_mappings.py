@@ -2,6 +2,7 @@
 
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -14,6 +15,7 @@ from pixi_ros.mappings import (
     reload_mappings,
     validate_distro,
 )
+from pixi_ros.validator import PackageSource, PackageValidationResult
 
 
 def test_map_common_packages():
@@ -285,3 +287,55 @@ def test_expand_gl_requirements_deduplicates():
     assert "libopengl-devel" in result
     assert "xorg-libx11" in result
     assert "xorg-libxext" in result
+
+
+def test_map_ros_to_conda_with_validator():
+    """Test map_ros_to_conda with validator parameter."""
+    mock_validator = MagicMock()
+    mock_validator.validate_package.return_value = PackageValidationResult(
+        package_name="test_pkg",
+        source=PackageSource.ROS_DISTRO,
+        conda_packages=["ros-humble-test-pkg"],
+    )
+
+    workspace_packages = {"ws_pkg"}
+    result = map_ros_to_conda(
+        "test_pkg",
+        "humble",
+        validator=mock_validator,
+        workspace_packages=workspace_packages,
+    )
+
+    assert result == ["ros-humble-test-pkg"]
+    mock_validator.validate_package.assert_called_once()
+
+
+def test_map_ros_to_conda_with_validator_workspace_package():
+    """Test map_ros_to_conda with validator returns empty for workspace packages."""
+    mock_validator = MagicMock()
+    mock_validator.validate_package.return_value = PackageValidationResult(
+        package_name="ws_pkg",
+        source=PackageSource.WORKSPACE,
+        conda_packages=[],
+    )
+
+    workspace_packages = {"ws_pkg"}
+    result = map_ros_to_conda(
+        "ws_pkg",
+        "humble",
+        validator=mock_validator,
+        workspace_packages=workspace_packages,
+    )
+
+    assert result == []
+    mock_validator.validate_package.assert_called_once()
+
+
+def test_map_ros_to_conda_without_validator_backward_compat():
+    """Test that map_ros_to_conda works without validator (backward compatibility)."""
+    # Should work as before when validator is not provided
+    result = map_ros_to_conda("rclcpp", "humble")
+    assert result == ["ros-humble-rclcpp"]
+
+    result = map_ros_to_conda("cmake", "humble")
+    assert result == ["cmake"]
