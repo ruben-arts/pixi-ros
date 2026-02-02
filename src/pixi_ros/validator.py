@@ -41,7 +41,6 @@ class RosDistroValidator:
         self.distro_name = distro_name
         self._distro = None
         self._init_error = None
-        self._conda_forge_cache: dict[tuple[str, str], bool] = {}
 
         try:
             index = get_index(get_index_url())
@@ -74,10 +73,6 @@ class RosDistroValidator:
         Returns:
             True if package is available on conda-forge
         """
-        # Check cache first
-        cache_key = (package_name, platform)
-        if cache_key in self._conda_forge_cache:
-            return self._conda_forge_cache[cache_key]
 
         try:
             gateway = Gateway()
@@ -100,14 +95,11 @@ class RosDistroValidator:
             for channel_records in results:
                 for record in channel_records:
                     if record.name.normalized == package_name.lower():
-                        self._conda_forge_cache[cache_key] = True
                         return True
 
-            self._conda_forge_cache[cache_key] = False
             return False
         except (asyncio.TimeoutError, Exception):
             # On error or timeout, assume not available
-            self._conda_forge_cache[cache_key] = False
             return False
 
     def validate_package(
@@ -155,6 +147,7 @@ class RosDistroValidator:
                     # Convert pixi platform to mapping platform
                     pixi_to_mapping = {
                         "linux-64": "linux",
+                        "linux-aarch64": "linux",
                         "osx-64": "osx",
                         "osx-arm64": "osx",
                         "win-64": "win64",
@@ -192,6 +185,10 @@ class RosDistroValidator:
             )
 
         # 5. Not found
+        print(
+            f"Package '{package_name}' not found in workspace, mappings, "
+            f"ROS distro, or conda-forge."
+        )
         return PackageValidationResult(
             package_name=package_name,
             source=PackageSource.NOT_FOUND,

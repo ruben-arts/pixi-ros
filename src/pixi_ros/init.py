@@ -4,7 +4,7 @@ from pathlib import Path
 
 import tomlkit
 import typer
-from rattler import Channel, Gateway, Platform
+from rattler import Platform
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
@@ -462,59 +462,6 @@ def _ensure_channels(config: dict, distro: str):
     workspace["channels"] = channels
 
 
-def _check_package_availability(
-    packages: list[str], channels: list[str], platform: Platform
-) -> dict[str, bool]:
-    """
-    Check if packages are available in the given channels.
-
-    Args:
-        packages: List of conda package names to check
-        channels: List of channel URLs
-        platform: Platform to check for
-
-    Returns:
-        Dictionary mapping package names to availability (True/False)
-    """
-    import asyncio
-
-    availability = dict.fromkeys(packages, False)
-
-    try:
-        # Create gateway for fetching repo data
-        gateway = Gateway()
-
-        # Convert channel URLs to Channel objects
-        channel_objects = [Channel(url) for url in channels]
-
-        # Query all channels at once (gateway.query is async)
-        repo_data_by_channel = asyncio.run(
-            gateway.query(
-                channel_objects,
-                [platform],
-                specs=packages,  # Correct parameter name
-                recursive=False,  # Don't fetch dependencies
-            )
-        )
-
-        # repo_data_by_channel is a list of lists (one per channel)
-        # Check all channels for each package
-        for channel_records in repo_data_by_channel:
-            for record in channel_records:
-                # Check if any of our packages match this record
-                for package_name in packages:
-                    if record.name.normalized == package_name.lower():
-                        availability[package_name] = True
-
-    except Exception as e:
-        # If query fails, log the error but continue (all marked as unavailable)
-        console.print(
-            f"[yellow]Warning: Could not check package availability: {e}[/yellow]"
-        )
-
-    return availability
-
-
 def _ensure_dependencies(
     config: dict,
     packages,
@@ -717,8 +664,6 @@ def _ensure_dependencies(
         dependencies["cmake"] = dep_versions["cmake"]
 
     # Add package dependencies
-    channels = config.get("workspace", {}).get("channels", [])
-
     # Add common dependencies (available on all platforms)
     if dep_sources:
         dependencies.add(tomlkit.nl())
@@ -729,52 +674,11 @@ def _ensure_dependencies(
         else:
             dependencies.add(tomlkit.comment("Workspace dependencies"))
 
-        # For common deps, check on first pixi platform as representative
-        first_pixi_platform = platforms[0]
-        first_platform = Platform(first_pixi_platform)
-
-        packages_to_check = [
-            conda_dep
-            for conda_dep in dep_sources.keys()
-            if conda_dep not in dependencies
-        ]
-
-        availability = {}
-        if channels and packages_to_check:
-            typer.echo(
-                f"Checking common package availability for {first_pixi_platform}..."
-            )
-            availability = _check_package_availability(
-                packages_to_check, channels, first_platform
-            )
-
-        available_packages = []
-        unavailable_packages = []
-
+        # Add all dependencies (validation already checked availability)
         for conda_dep in sorted(dep_sources.keys()):
             if conda_dep not in dependencies:
-                is_available = availability.get(conda_dep, True)
-                if is_available:
-                    available_packages.append(conda_dep)
-                else:
-                    unavailable_packages.append(conda_dep)
-
-        for conda_dep in available_packages:
-            version = dep_versions.get(conda_dep, "*")
-            dependencies[conda_dep] = version
-
-        if unavailable_packages:
-            dependencies.add(tomlkit.nl())
-            dependencies.add(
-                tomlkit.comment(
-                    "The following packages were not found in the configured channels:"
-                )
-            )
-            for conda_dep in unavailable_packages:
                 version = dep_versions.get(conda_dep, "*")
-                dependencies.add(
-                    tomlkit.comment(f'{conda_dep} = "{version}"  # NOT FOUND')
-                )
+                dependencies[conda_dep] = version
 
     config["dependencies"] = dependencies
 
@@ -822,45 +726,11 @@ def _ensure_dependencies(
                     tomlkit.comment("Unix-specific dependencies (Linux and macOS)")
                 )
 
-            # Check availability on linux platform as representative
-            representative_pixi_platform = platform_groups.get(
-                "linux", platform_groups.get("osx", platforms)
-            )[0]
-            platform_obj = Platform(representative_pixi_platform)
-            packages_to_check = list(unix_deps.keys())
-
-            availability = {}
-            if channels and packages_to_check:
-                typer.echo("Checking package availability for unix...")
-                availability = _check_package_availability(
-                    packages_to_check, channels, platform_obj
-                )
-
-            available_packages = []
-            unavailable_packages = []
-
+            # Add unix-specific dependencies
             for conda_dep in sorted(unix_deps.keys()):
                 if conda_dep not in target_deps:
-                    is_available = availability.get(conda_dep, True)
-                    if is_available:
-                        available_packages.append(conda_dep)
-                    else:
-                        unavailable_packages.append(conda_dep)
-
-            for conda_dep in available_packages:
-                version = dep_versions.get(conda_dep, "*")
-                target_deps[conda_dep] = version
-
-            if unavailable_packages:
-                target_deps.add(tomlkit.nl())
-                target_deps.add(
-                    tomlkit.comment("The following packages were not found:")
-                )
-                for conda_dep in unavailable_packages:
                     version = dep_versions.get(conda_dep, "*")
-                    target_deps.add(
-                        tomlkit.comment(f'{conda_dep} = "{version}"  # NOT FOUND')
-                    )
+                    target_deps[conda_dep] = version
 
     # Now add remaining platform-specific dependencies (not in common, not in unix)
     if len(mapping_platform_list) > 1:
@@ -890,46 +760,11 @@ def _ensure_dependencies(
                         )
                     )
 
-                # Check availability for this mapping platform
-                # Use the first pixi platform in the group as representative
-                representative_pixi_platform = platform_groups[mapping_platform][0]
-                platform_obj = Platform(representative_pixi_platform)
-                packages_to_check = list(platform_specific_deps.keys())
-
-                availability = {}
-                if channels and packages_to_check:
-                    typer.echo(
-                        f"Checking package availability for {mapping_platform}..."
-                    )
-                    availability = _check_package_availability(
-                        packages_to_check, channels, platform_obj
-                    )
-
-                available_packages = []
-                unavailable_packages = []
-
+                # Add platform-specific dependencies
                 for conda_dep in sorted(platform_specific_deps.keys()):
                     if conda_dep not in target_deps:
-                        is_available = availability.get(conda_dep, True)
-                        if is_available:
-                            available_packages.append(conda_dep)
-                        else:
-                            unavailable_packages.append(conda_dep)
-
-                for conda_dep in available_packages:
-                    version = dep_versions.get(conda_dep, "*")
-                    target_deps[conda_dep] = version
-
-                if unavailable_packages:
-                    target_deps.add(tomlkit.nl())
-                    target_deps.add(
-                        tomlkit.comment("The following packages were not found:")
-                    )
-                    for conda_dep in unavailable_packages:
                         version = dep_versions.get(conda_dep, "*")
-                        target_deps.add(
-                            tomlkit.comment(f'{conda_dep} = "{version}"  # NOT FOUND')
-                        )
+                        target_deps[conda_dep] = version
 
 
 def _ensure_tasks(config: dict):

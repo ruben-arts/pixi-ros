@@ -295,11 +295,11 @@ def get_platforms() -> list[str]:
 
     # Hardcoded supported platforms, as a hint for the user.
     pixi_platforms = ["linux-64", "linux-aarch64", "osx-64", "osx-arm64", "win-64"]
-    
+
     platform_str = str(Platform.current())
     if not any(platform_str in p for p in pixi_platforms):
         pixi_platforms.append(platform_str)
-    
+
     return pixi_platforms
 
 

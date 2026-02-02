@@ -3,11 +3,10 @@
 from typing import Annotated
 
 import typer
+from rattler import Platform
 
 from pixi_ros.init import init_workspace
 from pixi_ros.mappings import get_platforms, get_ros_distros
-
-from rattler import Platform
 
 app = typer.Typer(
     name="pixi-ros",
@@ -98,7 +97,10 @@ def init(
 
         # If nothing is selected, default to current platform
         if not selections:
-            typer.echo(f"No platforms selected, defaulting to current platform: {current_platform}.")
+            typer.echo(
+                f"No platforms selected, "
+                f"defaulting to current platform: {current_platform}."
+            )
             platforms.append(str(current_platform))
         else:
             for sel in selections:
@@ -123,8 +125,12 @@ def init(
                     if sel in available_platforms:
                         platforms.append(sel)
                     else:
-                        typer.echo(f"Error: '{sel}' is not a valid platform", err=True)
-                        typer.echo(f"Available: {', '.join(available_platforms)}", err=True)
+                        typer.echo(
+                            f"Error: '{sel}' is not a valid platform", err=True
+                        )
+                        typer.echo(
+                            f"Available: {', '.join(available_platforms)}", err=True
+                        )
                         raise typer.Exit(code=1) from err
 
             if not platforms:
