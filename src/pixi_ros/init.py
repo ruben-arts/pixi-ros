@@ -80,18 +80,6 @@ def init_workspace(
         package_names = ", ".join(p.name for p in packages)
         typer.echo(f"Found {len(packages)} package(s): {package_names}")
 
-    # Create validator for package validation
-    typer.echo(f"Initializing ROS {distro} distribution validator...")
-    validator = RosDistroValidator(distro)
-    if validator._init_error:
-        typer.echo(
-            f"Warning: Could not initialize ROS distro validator: "
-            f"{validator._init_error}",
-            err=True,
-        )
-        typer.echo("Continuing with fallback package resolution...", err=True)
-        validator = None
-
     # Load or create pixi.toml
     pixi_toml_path = workspace_path / "pixi.toml"
     if pixi_toml_path.exists():
@@ -105,6 +93,23 @@ def init_workspace(
     else:
         typer.echo(f"Creating new {pixi_toml_path}")
         pixi_config = tomlkit.document()
+
+    # Create validator for package validation
+    validator = None
+    with console.status(
+        f"[cyan]Fetching ROS {distro} distribution index...[/cyan]",
+        spinner="dots",
+    ):
+        validator = RosDistroValidator(distro)
+
+    if validator._init_error:
+        typer.echo(
+            f"Warning: Could not initialize ROS distro validator: "
+            f"{validator._init_error}",
+            err=True,
+        )
+        typer.echo("Continuing with fallback package resolution...", err=True)
+        validator = None
 
     # Display discovered dependencies
     _display_dependencies(packages, distro, validator)
