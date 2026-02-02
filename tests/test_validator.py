@@ -28,6 +28,31 @@ def mock_validator():
         mock_distro.return_value = mock_dist
 
         validator = RosDistroValidator("humble")
+
+        # Mock check_package_availability to return True for ROS packages
+        def mock_check_availability(package_name, platform, channel_url=None):
+            # ROS packages (with ros-distro- prefix) are available
+            if package_name.startswith("ros-humble-"):
+                return True
+            # Some conda-forge packages are available (used in tests)
+            if package_name in [
+                "eigen",
+                "cmake",
+                "boost",
+                "libusb",
+                "libudev",
+                "qt5",
+            ]:
+                return True
+            return False
+
+        validator.check_package_availability = MagicMock(
+            side_effect=mock_check_availability
+        )
+        validator.check_conda_forge_availability = MagicMock(
+            side_effect=mock_check_availability
+        )
+
         return validator
 
 
@@ -262,17 +287,38 @@ def test_validate_multiple_packages(mock_validator):
         "cmake": {"pixi": ["cmake"]}
     }
 
+    # Test without mocking availability (using default mock from fixture)
     results = []
     for pkg in ["ws_pkg", "cmake", "rclcpp", "unknown"]:
-        with patch.object(
-            mock_validator, "check_conda_forge_availability", return_value=False
-        ):
-            result = mock_validator.validate_package(
-                pkg, workspace_packages, mappings
-            )
-            results.append(result)
+        result = mock_validator.validate_package(
+            pkg, workspace_packages, mappings
+        )
+        results.append(result)
 
     assert results[0].source == PackageSource.WORKSPACE
     assert results[1].source == PackageSource.MAPPING
     assert results[2].source == PackageSource.ROS_DISTRO
     assert results[3].source == PackageSource.NOT_FOUND
+
+
+def test_validate_ros_distro_package_not_available_in_channels(mock_validator):
+    """Test ROS distro package that is not available in channels."""
+    workspace_packages = set()
+    mappings = {}
+
+    # Mock check_package_availability to return False for this package
+    with patch.object(
+        mock_validator, "check_package_availability", return_value=False
+    ):
+        result = mock_validator.validate_package(
+            "rclcpp", workspace_packages, mappings
+        )
+
+    # Package should be marked as NOT_FOUND but include the ROS package name
+    assert result.package_name == "rclcpp"
+    assert result.source == PackageSource.NOT_FOUND
+    assert result.conda_packages == ["ros-humble-rclcpp"]
+    assert "ROS package not available" in result.error
+    assert "robostack-humble" in result.error
+
+

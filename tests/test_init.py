@@ -2,6 +2,7 @@
 
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 import pytest
 
@@ -296,8 +297,19 @@ def test_common_dependencies_in_main_section():
 </package>
 """)
 
-        # Initialize with multiple platforms
-        init_workspace("humble", workspace_path, platforms=["linux-64", "osx-arm64"])
+        # Mock check_conda_forge_availability to return True for ROS packages
+        def mock_availability(package_name, platform):
+            # ROS packages are available
+            if package_name.startswith("ros-"):
+                return True
+            return False
+
+        with patch(
+            "pixi_ros.validator.RosDistroValidator.check_conda_forge_availability",
+            side_effect=mock_availability
+        ):
+            # Initialize with multiple platforms
+            init_workspace("humble", workspace_path, platforms=["linux-64", "osx-arm64"])
 
         # Check pixi.toml was created
         toml_path = workspace_path / "pixi.toml"
