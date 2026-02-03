@@ -125,9 +125,7 @@ def init(
                     if sel in available_platforms:
                         platforms.append(sel)
                     else:
-                        typer.echo(
-                            f"Error: '{sel}' is not a valid platform", err=True
-                        )
+                        typer.echo(f"Error: '{sel}' is not a valid platform", err=True)
                         typer.echo(
                             f"Available: {', '.join(available_platforms)}", err=True
                         )

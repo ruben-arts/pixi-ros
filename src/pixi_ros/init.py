@@ -791,8 +791,8 @@ def _ensure_dependencies(
                 linux_not_found = set(not_found_packages.get("linux", {}).keys())
                 osx_not_found = set(not_found_packages.get("osx", {}).keys())
                 unix_not_found_candidates = (
-                    (linux_not_found & osx_not_found) - common_not_found
-                )
+                    linux_not_found & osx_not_found
+                ) - common_not_found
 
                 if has_win:
                     win_not_found = set(
