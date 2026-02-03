@@ -64,6 +64,8 @@ cppunit:
     win64: []
 cppzmq:
   pixi: [cppzmq]
+crypto++:
+  pixi: [cryptopp]
 curl:
   pixi: [libcurl]
 cython:
@@ -914,6 +916,8 @@ python3-texttable:
   pixi: [texttable]
 python3-tk:
   pixi: [tk]
+python3-torch:
+  pixi: [pytorch]
 python3-tornado:
   pixi: [tornado]
 python3-transforms3d:
