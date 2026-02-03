@@ -345,10 +345,11 @@ Contributions welcome! Feel free to open issues or PRs on GitHub.
 
 ## Learn More
 
-- **Pixi**: https://pixi.sh
-- **RoboStack**: https://robostack.org/
-- **Conda**: https://docs.conda.io/
-- **ROS 2**: https://docs.ros.org/
+- Pixi: https://pixi.sh
+- RoboStack: https://robostack.org/
+- conda-forge: [https://](https://conda-forge.org/)
+- Conda: https://docs.conda.io/
+- ROS 2: https://docs.ros.org/
 
 ## Disclaimer
 
