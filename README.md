@@ -5,16 +5,6 @@
 pixi-ros helps ROS developers transition from `rosdep` to [Pixi](https://pixi.sh) for package management.
 It automatically reads your ROS workspace's `package.xml` files and generates a `pixi.toml` manifest with all dependencies resolved from conda channels (primarily [robostack](https://robostack.org/)).
 
-## Why pixi-ros?
-
-If you're a ROS developer, you're probably familiar with `rosdep` managing dependencies.
-`pixi-ros` gives you access to a more modern package management ecosystem:
-
-- **Reproducible environments**: Lock files ensure everyone on your team has identical dependencies
-- **Cross-platform**: Works seamlessly on Linux, macOS, and Windows
-- **Fast and reliable**: Uses rattler (Rust implementation of conda) for speed
-- **No system dependencies**: Everything isolated in project environments
-
 ## Quick Start
 
 ### Installation
