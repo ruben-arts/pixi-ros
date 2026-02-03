@@ -194,13 +194,6 @@ eigen = ">=3.3.0,<4.0.0"
 boost = "==1.2.3"
 ```
 
-## Supported ROS Distributions
-
-- ROS 2 Humble: https://prefix.dev/robostack-humble
-- ROS 2 Iron: https://prefix.dev/robostack-iron
-- ROS 2 Jazzy: https://prefix.dev/robostack-jazzy
-- ROS 2 Rolling: https://prefix.dev/robostack-rolling
-
 ## Command Reference
 
 ### `pixi-ros init`
