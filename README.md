@@ -328,6 +328,10 @@ If pixi-ros marks packages as "NOT FOUND" (shown in red in the validation output
 3. **Check conda-forge**: Some packages may be available directly on conda-forge without the `ros-distro-` prefix
 4. **Create a mapping**: Add a custom mapping in `pixi-ros/*.yaml` if the package has a different conda name
 5. **Add to workspace**: Consider including the package source in your workspace instead of depending on it
+6. **Contribute to RoboStack**: If the package should be available but isn't, consider adding it to the appropriate RoboStack repository:
+   - [ros-humble](https://github.com/RoboStack/ros-humble) (ROS 2)
+   - [ros-jazzy](https://github.com/RoboStack/ros-jazzy) (ROS 2)
+   - [ros-kilted](https://github.com/RoboStack/ros-kilted) (ROS 2)
 
 The validation table shows exactly where each dependency was checked, making it easier to diagnose issues.
 

@@ -94,7 +94,10 @@ were not found in the configured channels. You may need to:
 - Check if the package name is correct
 - Add additional channels with `pixi project channel add <channel-url>`
 - Install the package through pip: `pixi add --pypi <package-name>`
-- Add it to [conda-forge](https://github.com/conda-forge/staged-recipes) or [RoboStack](https://robostack.github.io/Contributing.html)
+- Contribute the package to [conda-forge](https://github.com/conda-forge/staged-recipes) or RoboStack:
+  - [ros-humble](https://github.com/RoboStack/ros-humble)
+  - [ros-jazzy](https://github.com/RoboStack/ros-jazzy)
+  - [ros-kilted](https://github.com/RoboStack/ros-kilted)
 
 ## Common Issues
 
