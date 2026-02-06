@@ -1,5 +1,6 @@
 """Initialize pixi.toml for ROS workspaces."""
 
+import os
 from pathlib import Path
 
 import tomlkit
@@ -155,6 +156,29 @@ def init_workspace(
         content.append("Activate the workspace with ", style="white")
         content.append("pixi shell", style="yellow bold")
         content.append("\n   and then run ROS commands directly.", style="dim")
+
+        # Warn if ROS environment is already sourced
+        ros_sourced = any(
+            [
+                os.getenv("ROS_DISTRO"),
+                os.getenv("ROS_VERSION"),
+                os.getenv("AMENT_PREFIX_PATH"),
+                os.getenv("ROS_PACKAGE_PATH"),
+            ]
+        )
+
+        if ros_sourced:
+            content.append("\n\n", style="white")
+            content.append("⚠️  Important: ", style="yellow bold")
+            content.append("Active ROS environment detected!\n", style="white")
+            content.append(
+                "   Pixi manages the environment automatically. Remove any ",
+                style="dim",
+            )
+            content.append("source /opt/ros/...", style="dim italic")
+            content.append("\n   or ", style="dim")
+            content.append("source install/setup.bash", style="dim italic")
+            content.append(" from your shell config (e.g. ~/.bashrc).", style="dim")
 
         # Display in a nice panel
         panel = Panel(

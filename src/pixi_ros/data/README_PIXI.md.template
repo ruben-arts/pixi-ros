@@ -114,6 +114,23 @@ If `ros2` commands aren't found:
 1. Run commands through pixi: `pixi run <command>`
 2. Or use a pixi shell: `pixi shell`
 
+### Active ROS Environment Conflicts
+
+If you see a warning about an "Active ROS environment detected" during initialization, it means you have an existing ROS environment sourced in your shell. This can cause conflicts with pixi's managed environment.
+
+**The problem:** Environment variables like `ROS_DISTRO`, `AMENT_PREFIX_PATH`, or `ROS_PACKAGE_PATH` from a manually sourced ROS installation can interfere with pixi's environment management.
+
+**The solution:**
+1. Open your shell configuration file (`~/.bashrc`, `~/.zshrc`, etc.)
+2. Remove or comment out lines that source ROS:
+   ```bash
+   # source /opt/ros/{distro}/setup.bash
+   # source ~/ros_ws/install/setup.bash
+   ```
+3. Restart your shell or run `source ~/.bashrc`
+
+Pixi automatically manages the ROS environment for you - no manual sourcing needed!
+
 ## Learn More
 
 - **Pixi Documentation**: https://pixi.sh

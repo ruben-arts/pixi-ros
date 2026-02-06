@@ -1,5 +1,7 @@
 """Tests for initialization and dependency detection logic."""
 
+import os
+from io import StringIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
@@ -568,3 +570,169 @@ def test_version_constraints_from_package_xml():
             boost_version = dependencies["boost"]
             assert boost_version != "*", "boost should have a version constraint"
             assert "==" in boost_version or "1.2.3" in str(boost_version), "boost should have == constraint"
+
+
+def test_ros_environment_warning_shown_when_ros_sourced():
+    """Test that warning is shown when ROS environment is detected."""
+    from pixi_ros.init import init_workspace
+    from rich.console import Console
+
+    with TemporaryDirectory() as tmpdir:
+        workspace_path = Path(tmpdir)
+        src_dir = workspace_path / "src"
+        src_dir.mkdir()
+
+        # Create a simple package.xml
+        pkg_xml = src_dir / "package.xml"
+        pkg_xml.write_text("""<?xml version="1.0"?>
+<package format="2">
+    <name>test_pkg</name>
+    <version>0.0.1</version>
+    <description>Test</description>
+    <maintainer email="test@test.com">Test</maintainer>
+    <license>MIT</license>
+</package>
+""")
+
+        # Mock environment with ROS_DISTRO set (simulating sourced ROS environment)
+        with patch.dict("os.environ", {"ROS_DISTRO": "noetic"}):
+            # Capture console output
+            output = StringIO()
+            test_console = Console(file=output, force_terminal=True, width=120)
+
+            # Mock the console in the init module
+            with patch("pixi_ros.init.console", test_console):
+                # Initialize workspace
+                init_workspace("humble", workspace_path, platforms=["linux-64"])
+
+            # Get the output
+            output_text = output.getvalue()
+
+            # Check that the warning is present
+            assert "Active ROS environment detected!" in output_text, "Warning about ROS environment should be shown"
+            assert "source /opt/ros/" in output_text, "Should mention source /opt/ros/"
+            assert "source install/setup.bash" in output_text, "Should mention source install/setup.bash"
+            assert "~/.bashrc" in output_text, "Should mention ~/.bashrc as an example"
+
+
+def test_ros_environment_warning_not_shown_when_not_sourced():
+    """Test that warning is NOT shown when ROS environment is not detected."""
+    from pixi_ros.init import init_workspace
+    from rich.console import Console
+
+    with TemporaryDirectory() as tmpdir:
+        workspace_path = Path(tmpdir)
+        src_dir = workspace_path / "src"
+        src_dir.mkdir()
+
+        # Create a simple package.xml
+        pkg_xml = src_dir / "package.xml"
+        pkg_xml.write_text("""<?xml version="1.0"?>
+<package format="2">
+    <name>test_pkg</name>
+    <version>0.0.1</version>
+    <description>Test</description>
+    <maintainer email="test@test.com">Test</maintainer>
+    <license>MIT</license>
+</package>
+""")
+
+        # Make sure ROS environment variables are not set
+        env_without_ros = {k: v for k, v in os.environ.items()
+                          if k not in ["ROS_DISTRO", "ROS_VERSION", "AMENT_PREFIX_PATH", "ROS_PACKAGE_PATH"]}
+
+        with patch.dict("os.environ", env_without_ros, clear=True):
+            # Capture console output
+            output = StringIO()
+            test_console = Console(file=output, force_terminal=True, width=120)
+
+            # Mock the console in the init module
+            with patch("pixi_ros.init.console", test_console):
+                # Initialize workspace
+                init_workspace("humble", workspace_path, platforms=["linux-64"])
+
+            # Get the output
+            output_text = output.getvalue()
+
+            # Check that the warning is NOT present
+            assert "Active ROS environment detected!" not in output_text, "Warning should not be shown when ROS is not sourced"
+
+
+def test_ros_environment_warning_with_ros_version():
+    """Test that warning is shown when ROS_VERSION is set."""
+    from pixi_ros.init import init_workspace
+    from rich.console import Console
+
+    with TemporaryDirectory() as tmpdir:
+        workspace_path = Path(tmpdir)
+        src_dir = workspace_path / "src"
+        src_dir.mkdir()
+
+        # Create a simple package.xml
+        pkg_xml = src_dir / "package.xml"
+        pkg_xml.write_text("""<?xml version="1.0"?>
+<package format="2">
+    <name>test_pkg</name>
+    <version>0.0.1</version>
+    <description>Test</description>
+    <maintainer email="test@test.com">Test</maintainer>
+    <license>MIT</license>
+</package>
+""")
+
+        # Mock environment with ROS_VERSION set
+        with patch.dict("os.environ", {"ROS_VERSION": "2"}):
+            # Capture console output
+            output = StringIO()
+            test_console = Console(file=output, force_terminal=True, width=120)
+
+            # Mock the console in the init module
+            with patch("pixi_ros.init.console", test_console):
+                # Initialize workspace
+                init_workspace("humble", workspace_path, platforms=["linux-64"])
+
+            # Get the output
+            output_text = output.getvalue()
+
+            # Check that the warning is present
+            assert "Active ROS environment detected!" in output_text, "Warning should be shown when ROS_VERSION is set"
+
+
+def test_ros_environment_warning_with_ament_prefix_path():
+    """Test that warning is shown when AMENT_PREFIX_PATH is set."""
+    from pixi_ros.init import init_workspace
+    from rich.console import Console
+
+    with TemporaryDirectory() as tmpdir:
+        workspace_path = Path(tmpdir)
+        src_dir = workspace_path / "src"
+        src_dir.mkdir()
+
+        # Create a simple package.xml
+        pkg_xml = src_dir / "package.xml"
+        pkg_xml.write_text("""<?xml version="1.0"?>
+<package format="2">
+    <name>test_pkg</name>
+    <version>0.0.1</version>
+    <description>Test</description>
+    <maintainer email="test@test.com">Test</maintainer>
+    <license>MIT</license>
+</package>
+""")
+
+        # Mock environment with AMENT_PREFIX_PATH set (ROS 2 specific)
+        with patch.dict("os.environ", {"AMENT_PREFIX_PATH": "/opt/ros/humble"}):
+            # Capture console output
+            output = StringIO()
+            test_console = Console(file=output, force_terminal=True, width=120)
+
+            # Mock the console in the init module
+            with patch("pixi_ros.init.console", test_console):
+                # Initialize workspace
+                init_workspace("humble", workspace_path, platforms=["linux-64"])
+
+            # Get the output
+            output_text = output.getvalue()
+
+            # Check that the warning is present
+            assert "Active ROS environment detected!" in output_text, "Warning should be shown when AMENT_PREFIX_PATH is set"

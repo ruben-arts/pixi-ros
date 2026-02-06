@@ -343,6 +343,33 @@ pixi-ros includes mapping files for system packages (e.g., `cmake` → `cmake`, 
 
 Some packages have platform-specific mappings. pixi-ros handles this automatically, but you can test different platforms using the internal API with `platform_override`.
 
+### Active ROS Environment Detected
+
+If you have an existing ROS environment sourced (e.g., from `source /opt/ros/humble/setup.bash` in your `~/.bashrc`), `pixi-ros init` will warn you:
+
+```
+⚠️  Important: Active ROS environment detected!
+   Pixi manages the environment automatically. Remove any source /opt/ros/...
+   or source install/setup.bash from your shell config (e.g. ~/.bashrc).
+```
+
+This warning appears when any of these environment variables are detected:
+- `ROS_DISTRO` - Indicates a sourced ROS distribution
+- `ROS_VERSION` - Set by ROS 1 or ROS 2
+- `AMENT_PREFIX_PATH` - ROS 2 specific variable
+- `ROS_PACKAGE_PATH` - ROS 1 specific variable
+
+**Why this matters:** Having a manually sourced ROS environment can conflict with pixi's managed environment, leading to version mismatches and unexpected behavior. Pixi automatically sources the correct setup scripts when you use `pixi shell` or `pixi run`, so manual sourcing is unnecessary.
+
+**How to fix:**
+1. Open your shell configuration file (e.g., `~/.bashrc`, `~/.zshrc`)
+2. Remove or comment out any lines like:
+   ```bash
+   source /opt/ros/humble/setup.bash
+   source ~/ros_ws/install/setup.bash
+   ```
+3. Restart your shell or run `source ~/.bashrc` (or equivalent)
+
 ## Contributing
 
 Contributions welcome! Feel free to open issues or PRs on GitHub.
