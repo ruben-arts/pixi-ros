@@ -11,3 +11,6 @@ devel/
 install/
 log/
 resource/
+
+# MacOS
+.DS_Store

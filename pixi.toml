@@ -19,5 +19,4 @@ name = "pixi-build-python"
 version = ">=0.4"
 
 [package.build.config]
-noarch = true
 ignore-pypi-mapping = false  # Enable automatic PyPI-to-conda mapping
