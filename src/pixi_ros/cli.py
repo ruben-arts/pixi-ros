@@ -12,9 +12,13 @@ app = typer.Typer(
     name="pixi-ros",
     help="Pixi extension for ROS package management",
     no_args_is_help=True,
+    context_settings={"help_option_names": ["-h", "--help"]},
 )
 
-pkg_app = typer.Typer(help="Manage ROS packages")
+pkg_app = typer.Typer(
+    help="Manage ROS packages",
+    context_settings={"help_option_names": ["-h", "--help"]},
+)
 app.add_typer(pkg_app, name="pkg")
 
 
