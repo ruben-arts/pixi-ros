@@ -149,6 +149,50 @@ def test_discover_packages_empty_workspace():
         assert len(packages) == 0
 
 
+def test_discover_packages_respects_colcon_ignore():
+    """Test that directories with a COLCON_IGNORE file are skipped."""
+    with TemporaryDirectory() as tmpdir:
+        tmppath = Path(tmpdir)
+
+        pkg_xml_content = """<?xml version="1.0"?>
+        <package format="3">
+            <name>{name}</name>
+            <version>0.1.0</version>
+            <description>Test</description>
+            <maintainer email="test@test.com">Test</maintainer>
+            <license>MIT</license>
+        </package>
+        """
+
+        # valid_pkg — should be discovered
+        valid_dir = tmppath / "valid_pkg"
+        valid_dir.mkdir()
+        (valid_dir / "package.xml").write_text(pkg_xml_content.format(name="valid_pkg"))
+
+        # ignored_pkg — has COLCON_IGNORE, should be skipped
+        ignored_dir = tmppath / "ignored_pkg"
+        ignored_dir.mkdir()
+        (ignored_dir / "package.xml").write_text(
+            pkg_xml_content.format(name="ignored_pkg")
+        )
+        (ignored_dir / "COLCON_IGNORE").touch()
+
+        # nested_ignored — parent has COLCON_IGNORE, child should also be skipped
+        nested_parent = tmppath / "nested_parent"
+        nested_parent.mkdir()
+        (nested_parent / "COLCON_IGNORE").touch()
+        nested_child = nested_parent / "nested_pkg"
+        nested_child.mkdir()
+        (nested_child / "package.xml").write_text(
+            pkg_xml_content.format(name="nested_pkg")
+        )
+
+        packages = discover_packages(tmppath)
+
+        assert len(packages) == 1
+        assert packages[0].name == "valid_pkg"
+
+
 def test_discover_packages_respects_gitignore():
     """Test that package discovery respects .gitignore patterns."""
     with TemporaryDirectory() as tmpdir:
