@@ -15,6 +15,7 @@ class PackageSource(Enum):
     MAPPING = "mapping"
     ROS_DISTRO = "ros_distro"
     CONDA_FORGE = "conda_forge"
+    CUSTOM_CHANNEL = "custom_channel"
     NOT_FOUND = "not_found"
 
 
@@ -26,19 +27,23 @@ class PackageValidationResult:
     source: PackageSource
     conda_packages: list[str]
     error: str | None = None
+    channel: str | None = None
 
 
 class RosDistroValidator:
     """Validator for ROS packages using rosdistro."""
 
-    def __init__(self, distro_name: str):
+    def __init__(self, distro_name: str, extra_channels: list[str] | None = None):
         """
         Initialize validator with ROS distribution.
 
         Args:
             distro_name: ROS distribution name (e.g., "humble", "jazzy")
+            extra_channels: Additional channel URLs to search when a package is
+                not found in the default sources.
         """
         self.distro_name = distro_name
+        self._extra_channels = extra_channels or []
         self._distro = None
         self._init_error = None
         self._conda_forge_cache = {}
@@ -155,6 +160,7 @@ class RosDistroValidator:
         # Step 1: Determine source without validation
         source = None
         conda_packages = []
+        found_in_channel = None
 
         # 1. Check if it's a workspace package
         if package_name in workspace_packages:
@@ -199,11 +205,50 @@ class RosDistroValidator:
                 source = PackageSource.CONDA_FORGE
                 conda_packages = [conda_name]
 
-        # 5. Not found
+        # 5. Check custom channels
+        if source is None and self._extra_channels:
+            conda_name = package_name.replace("_", "-")
+
+            # Build candidate names to try, in priority order:
+            # a) ros-{distro}-{name}  (standard RoboStack convention)
+            # b) {name}               (direct conda package name)
+            # c) names from mapping files (handles non-obvious name mappings)
+            candidates = [
+                f"ros-{self.distro_name}-{conda_name}",
+                conda_name,
+            ]
+
+            if package_name in mappings:
+                channel_mapping = next(iter(mappings[package_name].values()), None)
+                if isinstance(channel_mapping, list):
+                    candidates.extend(channel_mapping)
+                elif isinstance(channel_mapping, dict):
+                    pixi_to_mapping = {
+                        "linux-64": "linux",
+                        "linux-aarch64": "linux",
+                        "osx-64": "osx",
+                        "osx-arm64": "osx",
+                        "win-64": "win64",
+                    }
+                    mapping_platform = pixi_to_mapping.get(platform, "linux")
+                    candidates.extend(channel_mapping.get(mapping_platform, []))
+
+            found_in_channel = None
+            for channel_url in self._extra_channels:
+                for candidate in candidates:
+                    if self.check_package_availability(candidate, platform, channel_url):
+                        source = PackageSource.CUSTOM_CHANNEL
+                        conda_packages = [candidate]
+                        found_in_channel = channel_url
+                        break
+                if source is not None:
+                    break
+
+        # 6. Not found
         if source is None:
             print(
                 f"Package '{package_name}' not found in workspace, mappings, "
-                f"ROS distro, or conda-forge."
+                f"ROS distro, conda-forge, or custom channels."
             )
             return PackageValidationResult(
                 package_name=package_name,
@@ -242,4 +287,5 @@ class RosDistroValidator:
             package_name=package_name,
             source=source,
             conda_packages=conda_packages,
+            channel=found_in_channel if source == PackageSource.CUSTOM_CHANNEL else None,
         )

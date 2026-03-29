@@ -77,7 +77,8 @@ When resolving a ROS package dependency, `pixi-ros` checks sources in this order
 2. **Mapping files** → Use custom conda package mappings from the embedded mapping.
 3. **ROS distribution** → Query the official ROS distro index for `ros-{distro}-{package}` packages
 4. **conda-forge** (auto-detection) → Search conda-forge for packages without ros-distro prefix
-5. **NOT FOUND** → Mark as unavailable and comment out in `pixi.toml`
+5. **Custom channels** → Search any channels supplied via `--channel` (see below)
+6. **NOT FOUND** → Mark as unavailable and comment out in `pixi.toml`
 
 #### Package Sources
 
@@ -86,6 +87,7 @@ The dependency tables show where each package comes from:
 - **ROS {distro}**: Official ROS distribution packages from robostack (e.g., `ros-humble-rclcpp`)
 - **Mapping**: Custom mappings from YAML files (e.g., `cmake` → `cmake`, `udev` → `libusb + libudev`)
 - **conda-forge**: Auto-detected packages available directly on conda-forge
+- **{custom-channel-name}**: Package found in a custom channel (shown in purple, named after the channel)
 - **Workspace**: Local packages in your workspace (skipped from dependencies)
 - **NOT FOUND**: Packages that couldn't be resolved (commented out in `pixi.toml`)
 
@@ -201,6 +203,9 @@ pixi-ros init
 - `--platform`, `-p`: Target platforms (optional, can be specified multiple times, will prompt if not provided)
   - Available: `linux-64`, `osx-64`, `osx-arm64`, `win-64`
   - Platforms come from the mapping files and determine which dependencies are available
+- `--channel`, `-c`: Additional channels to search for packages (optional, can be specified multiple times)
+  - Accepts URLs (`https://prefix.dev/my-channel`) or local paths (`./my-channel`, `~/channels/my-channel`)
+  - Channels are added to `pixi.toml` with higher priority than the default robostack and conda-forge channels
 
 **What it does:**
 - Scans workspace for `package.xml` files
@@ -290,6 +295,52 @@ Available target platforms:
 Select platforms (enter numbers or names, comma or space separated): 1 3
 ```
 
+## Custom Channels
+
+If your workspace depends on packages that live outside the default robostack and conda-forge channels — for example, internal builds or early-access ROS packages — you can point `pixi-ros` at additional channels with `--channel` / `-c`.
+
+```bash
+# Single custom channel
+pixi-ros init --distro kilted --channel https://prefix.dev/my-org
+
+# Multiple custom channels
+pixi-ros init --distro kilted -c https://prefix.dev/channel-a -c https://prefix.dev/channel-b
+
+# Local channel (relative or absolute path)
+pixi-ros init --distro kilted --channel ./my-local-channel
+pixi-ros init --distro kilted --channel ~/channels/staging
+```
+
+### Channel priority in pixi.toml
+
+Custom channels are written to `pixi.toml` **before** the default channels, giving them the highest resolution priority when `pixi install` runs:
+
+```toml
+[workspace]
+channels = [
+    "https://prefix.dev/my-org",          # custom — highest priority
+    "https://prefix.dev/robostack-kilted", # default
+    "https://prefix.dev/conda-forge",      # default
+]
+```
+
+### Local channels
+
+Relative and home-directory paths are accepted and preserved as-is in `pixi.toml` so pixi can resolve them relative to the workspace. Internally, `pixi-ros` resolves them to absolute `file://` URIs only for the validation step.
+
+```bash
+pixi-ros init --distro kilted --channel ./tests/data/my-channel
+```
+
+```toml
+# pixi.toml — relative path kept intact
+channels = [
+    "./tests/data/my-channel",
+    "https://prefix.dev/robostack-kilted",
+    "https://prefix.dev/conda-forge",
+]
+```
+
 ## Philosophy
 
 `pixi-ros` aims to be a quick **gateway drug**. It:
@@ -326,9 +377,13 @@ If pixi-ros marks packages as "NOT FOUND" (shown in red in the validation output
 1. **Check the ROS distro**: Verify the package exists in robostack: https://prefix.dev/channels/robostack-{distro}
 2. **Check for typos**: Review your `package.xml` for spelling errors
 3. **Check conda-forge**: Some packages may be available directly on conda-forge without the `ros-distro-` prefix
-4. **Create a mapping**: Add a custom mapping in `pixi-ros/*.yaml` if the package has a different conda name
-5. **Add to workspace**: Consider including the package source in your workspace instead of depending on it
-6. **Contribute to RoboStack**: If the package should be available but isn't, consider adding it to the appropriate RoboStack repository:
+4. **Use a custom channel**: If the package lives in a non-default channel, pass it with `--channel`:
+   ```bash
+   pixi-ros init --distro humble --channel https://prefix.dev/my-org
+   ```
+5. **Create a mapping**: Add a custom mapping in `pixi-ros/*.yaml` if the package has a different conda name
+6. **Add to workspace**: Consider including the package source in your workspace instead of depending on it
+7. **Contribute to RoboStack**: If the package should be available but isn't, consider adding it to the appropriate RoboStack repository:
    - [ros-humble](https://github.com/RoboStack/ros-humble) (ROS 2)
    - [ros-jazzy](https://github.com/RoboStack/ros-jazzy) (ROS 2)
    - [ros-kilted](https://github.com/RoboStack/ros-kilted) (ROS 2)

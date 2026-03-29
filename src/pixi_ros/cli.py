@@ -41,6 +41,15 @@ def init(
             " Can be specified multiple times.",
         ),
     ] = None,
+    channels: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--channel",
+            "-c",
+            help="Additional channels to search for packages (e.g., https://prefix.dev/my-channel)."
+            " Can be specified multiple times. Added before default channels.",
+        ),
+    ] = None,
 ):
     """Initialize pixi.toml for a ROS workspace."""
     # If distro not provided, prompt user to select one
@@ -139,7 +148,7 @@ def init(
                 typer.echo("Error: No platforms selected", err=True)
                 raise typer.Exit(code=1)
 
-    init_workspace(distro, platforms=platforms)
+    init_workspace(distro, platforms=platforms, channels=channels)
 
 
 def main():
