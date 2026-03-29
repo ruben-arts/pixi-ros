@@ -27,6 +27,7 @@ def init_workspace(
     distro: str,
     workspace_path: Path | None = None,
     platforms: list[str] | None = None,
+    channels: list[str] | None = None,
 ) -> bool:
     """
     Initialize or update pixi.toml for a ROS workspace.
@@ -54,6 +55,19 @@ def init_workspace(
             raise typer.Exit(code=1)
     else:
         workspace_path = workspace_path.resolve()
+
+    # Resolve any relative or local path channels to file:// URIs for the validator
+    # (rattler Gateway requires absolute URIs). The original strings are kept for
+    # pixi.toml so pixi can handle them natively.
+    validator_channels = None
+    if channels:
+        validator_channels = []
+        for ch in channels:
+            p = Path(ch).expanduser()
+            if p.exists():
+                validator_channels.append(p.resolve().as_uri())
+            else:
+                validator_channels.append(ch)
 
     typer.echo(f"Initializing ROS {distro} workspace at: {workspace_path}")
 
@@ -94,7 +108,7 @@ def init_workspace(
         f"[cyan]Fetching ROS {distro} distribution index...[/cyan]",
         spinner="dots",
     ):
-        validator = RosDistroValidator(distro)
+        validator = RosDistroValidator(distro, extra_channels=validator_channels)
 
     if validator._init_error:
         typer.echo(
@@ -110,7 +124,7 @@ def init_workspace(
 
     # Update configuration
     _ensure_workspace_section(pixi_config, workspace_path, platforms)
-    _ensure_channels(pixi_config, distro)
+    _ensure_channels(pixi_config, distro, channels)
     _ensure_dependencies(
         pixi_config, packages, distro, platforms, validator, not_found_packages
     )
@@ -244,6 +258,7 @@ def _display_dependencies(packages, distro: str, validator=None):
         "mapping": 0,
         "ros_distro": 0,
         "conda_forge": 0,
+        "custom_channel": 0,
         "not_found": 0,
     }
     not_found_packages: dict[str, tuple[set[str], list[str]]] = {}
@@ -267,6 +282,10 @@ def _display_dependencies(packages, distro: str, validator=None):
             elif result.source == PackageSource.CONDA_FORGE:
                 validation_stats["conda_forge"] += 1
                 source_label = "[blue]conda-forge[/blue]"
+            elif result.source == PackageSource.CUSTOM_CHANNEL:
+                validation_stats["custom_channel"] += 1
+                short_name = (result.channel or "").rstrip("/").rsplit("/", 1)[-1]
+                source_label = f"[magenta]{short_name}[/magenta]"
             elif result.source == PackageSource.NOT_FOUND:
                 validation_stats["not_found"] += 1
                 source_label = "[red]NOT FOUND[/red]"
@@ -412,6 +431,11 @@ def _display_dependencies(packages, distro: str, validator=None):
                 f"  [green]✓[/green] {validation_stats['conda_forge']} "
                 f"packages from conda-forge (auto-detected)"
             )
+        if validation_stats["custom_channel"] > 0:
+            console.print(
+                f"  [green]✓[/green] {validation_stats['custom_channel']} "
+                f"packages from custom channel(s)"
+            )
         if validation_stats["not_found"] > 0:
             console.print(
                 f"  [yellow]⚠[/yellow] {validation_stats['not_found']} "
@@ -465,10 +489,17 @@ def _ensure_workspace_section(
         workspace["platforms"] = existing_platforms
 
 
-def _ensure_channels(config: dict, distro: str):
+def _ensure_channels(
+    config: dict, distro: str, extra_channels: list[str] | None = None
+):
     """Ensure required ROS channels are present."""
     workspace = config.setdefault("workspace", {})
     channels = workspace.setdefault("channels", [])
+
+    # User-supplied channels go first (highest priority)
+    for channel in extra_channels or []:
+        if channel not in channels:
+            channels.insert(0, channel)
 
     # Required channels for ROS
     channel_host = "https://prefix.dev"

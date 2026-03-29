@@ -12,9 +12,13 @@ app = typer.Typer(
     name="pixi-ros",
     help="Pixi extension for ROS package management",
     no_args_is_help=True,
+    context_settings={"help_option_names": ["-h", "--help"]},
 )
 
-pkg_app = typer.Typer(help="Manage ROS packages")
+pkg_app = typer.Typer(
+    help="Manage ROS packages",
+    context_settings={"help_option_names": ["-h", "--help"]},
+)
 app.add_typer(pkg_app, name="pkg")
 
 
@@ -35,6 +39,15 @@ def init(
             "-p",
             help="Target platforms (e.g., linux-64, osx-arm64, win-64)."
             " Can be specified multiple times.",
+        ),
+    ] = None,
+    channels: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--channel",
+            "-c",
+            help="Additional channels to search for packages (e.g., https://prefix.dev/my-channel)."
+            " Can be specified multiple times. Added before default channels.",
         ),
     ] = None,
 ):
@@ -135,7 +148,7 @@ def init(
                 typer.echo("Error: No platforms selected", err=True)
                 raise typer.Exit(code=1)
 
-    init_workspace(distro, platforms=platforms)
+    init_workspace(distro, platforms=platforms, channels=channels)
 
 
 def main():

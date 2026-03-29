@@ -2,7 +2,7 @@
 
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -264,9 +264,7 @@ def test_expand_gl_requirements_osx():
 def test_expand_gl_requirements_win64():
     """Test expanding GL requirements on Windows."""
     # Test REQUIRE_GL (should be removed, nothing added)
-    result = expand_gl_requirements(
-        ["cmake", "REQUIRE_GL"], platform_override="win64"
-    )
+    result = expand_gl_requirements(["cmake", "REQUIRE_GL"], platform_override="win64")
     assert result == ["cmake"]
 
     # Test REQUIRE_OPENGL (should be removed, nothing added)
@@ -278,7 +276,7 @@ def test_expand_gl_requirements_win64():
 
 def test_expand_gl_requirements_deduplicates():
     """Test that expand_gl_requirements removes duplicates."""
-    # If both REQUIRE_GL and REQUIRE_OPENGL are present, libgl-devel should only appear once
+    # If both REQUIRE_GL and REQUIRE_OPENGL are present, libgl-devel should appear once
     result = expand_gl_requirements(
         ["REQUIRE_GL", "REQUIRE_OPENGL"], platform_override="linux"
     )
