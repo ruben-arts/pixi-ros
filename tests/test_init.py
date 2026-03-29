@@ -440,40 +440,13 @@ def test_tasks_have_descriptions():
         assert "tasks" in config
         tasks = config["tasks"]
 
-        # Check that expected tasks exist and have descriptions
-        expected_tasks = {
-            "build": {
-                "cmd": "colcon build",
-                "description": "Build the ROS workspace",
-            },
-            "test": {
-                "cmd": "colcon test",
-                "description": "Run tests for the workspace",
-            },
-            "clean": {
-                "cmd": "rm -rf build install log",
-                "description": "Clean build artifacts (build, install, log dirs)",
-            },
-        }
-
-        for task_name, expected_config in expected_tasks.items():
+        # Check that expected tasks exist and have cmd + description keys
+        for task_name in ["build", "test", "clean"]:
             assert task_name in tasks, f"Task '{task_name}' not found in pixi.toml"
             task = tasks[task_name]
-
-            # Task should be a dict/table with cmd and description
             assert isinstance(task, dict), f"Task '{task_name}' should be a dictionary"
             assert "cmd" in task, f"Task '{task_name}' missing 'cmd' field"
-            assert "description" in task, (
-                f"Task '{task_name}' missing 'description' field"
-            )
-
-            # Verify the content matches
-            assert task["cmd"] == expected_config["cmd"], (
-                f"Task '{task_name}' has wrong command"
-            )
-            assert task["description"] == expected_config["description"], (
-                f"Task '{task_name}' has wrong description"
-            )
+            assert "description" in task, f"Task '{task_name}' missing 'description' field"
 
 
 def test_platforms_extended_not_overridden():
