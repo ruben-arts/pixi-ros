@@ -236,7 +236,9 @@ class RosDistroValidator:
             found_in_channel = None
             for channel_url in self._extra_channels:
                 for candidate in candidates:
-                    if self.check_package_availability(candidate, platform, channel_url):
+                    if self.check_package_availability(
+                        candidate, platform, channel_url
+                    ):
                         source = PackageSource.CUSTOM_CHANNEL
                         conda_packages = [candidate]
                         found_in_channel = channel_url
@@ -287,5 +289,7 @@ class RosDistroValidator:
             package_name=package_name,
             source=source,
             conda_packages=conda_packages,
-            channel=found_in_channel if source == PackageSource.CUSTOM_CHANNEL else None,
+            channel=found_in_channel
+            if source == PackageSource.CUSTOM_CHANNEL
+            else None,
         )

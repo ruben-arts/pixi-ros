@@ -6,8 +6,6 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-import pytest
-
 from pixi_ros.utils import detect_cmake_version_requirement
 
 
@@ -38,7 +36,9 @@ def test_cmake_version_3_10_and_above_no_constraint():
         for version in test_versions:
             cmake_file.write_text(f"cmake_minimum_required(VERSION {version})\n")
             constraint = detect_cmake_version_requirement(pkg_path)
-            assert constraint is None, f"Version {version} should not require constraint"
+            assert constraint is None, (
+                f"Version {version} should not require constraint"
+            )
 
 
 def test_no_cmake_file_returns_none():
@@ -144,7 +144,9 @@ def test_cmake_version_4_and_above():
         for version in test_versions:
             cmake_file.write_text(f"cmake_minimum_required(VERSION {version})\n")
             constraint = detect_cmake_version_requirement(pkg_path)
-            assert constraint is None, f"Version {version} should not require constraint"
+            assert constraint is None, (
+                f"Version {version} should not require constraint"
+            )
 
 
 def test_platforms_added_to_workspace_single_platform():
@@ -177,6 +179,7 @@ def test_platforms_added_to_workspace_single_platform():
 
         # Parse and check platforms
         import tomlkit
+
         with open(toml_path) as f:
             config = tomlkit.load(f)
 
@@ -207,7 +210,11 @@ def test_platforms_added_to_workspace_multiple_platforms():
 """)
 
         # Initialize with multiple platforms
-        init_workspace("humble", workspace_path, platforms=["linux-64", "osx-64", "osx-arm64", "win-64"])
+        init_workspace(
+            "humble",
+            workspace_path,
+            platforms=["linux-64", "osx-64", "osx-arm64", "win-64"],
+        )
 
         # Check pixi.toml was created
         toml_path = workspace_path / "pixi.toml"
@@ -215,6 +222,7 @@ def test_platforms_added_to_workspace_multiple_platforms():
 
         # Parse and check platforms
         import tomlkit
+
         with open(toml_path) as f:
             config = tomlkit.load(f)
 
@@ -256,6 +264,7 @@ def test_target_sections_created_for_platform_specific_deps():
 
         # Parse and check target sections
         import tomlkit
+
         with open(toml_path) as f:
             config = tomlkit.load(f)
 
@@ -274,11 +283,14 @@ def test_target_sections_created_for_platform_specific_deps():
             assert "dependencies" in config["target"]["osx"]
             osx_deps = config["target"]["osx"]["dependencies"]
             # Check for X11-related packages
-            assert any("x11" in str(dep).lower() or "xorg" in str(dep).lower() for dep in osx_deps.keys())
+            assert any(
+                "x11" in str(dep).lower() or "xorg" in str(dep).lower()
+                for dep in osx_deps.keys()
+            )
 
 
 def test_common_dependencies_in_main_section():
-    """Test that common dependencies (available on all platforms) go to main dependencies section."""
+    """Test that common dependencies go to the main dependencies section."""
     from pixi_ros.init import init_workspace
 
     with TemporaryDirectory() as tmpdir:
@@ -308,10 +320,12 @@ def test_common_dependencies_in_main_section():
 
         with patch(
             "pixi_ros.validator.RosDistroValidator.check_conda_forge_availability",
-            side_effect=mock_availability
+            side_effect=mock_availability,
         ):
             # Initialize with multiple platforms
-            init_workspace("humble", workspace_path, platforms=["linux-64", "osx-arm64"])
+            init_workspace(
+                "humble", workspace_path, platforms=["linux-64", "osx-arm64"]
+            )
 
         # Check pixi.toml was created
         toml_path = workspace_path / "pixi.toml"
@@ -319,6 +333,7 @@ def test_common_dependencies_in_main_section():
 
         # Parse and check dependencies
         import tomlkit
+
         with open(toml_path) as f:
             config = tomlkit.load(f)
 
@@ -340,7 +355,7 @@ def test_unix_target_for_linux_and_osx_deps():
         src_dir.mkdir()
 
         # Create package.xml with opengl dependency
-        # OpenGL requires X11 packages on both linux and osx, but different GL packages on linux only
+        # OpenGL requires X11 on linux and osx, but different GL packages on linux only
         pkg_xml = src_dir / "package.xml"
         pkg_xml.write_text("""<?xml version="1.0"?>
 <package format="2">
@@ -362,6 +377,7 @@ def test_unix_target_for_linux_and_osx_deps():
 
         # Parse and check target sections
         import tomlkit
+
         with open(toml_path) as f:
             config = tomlkit.load(f)
 
@@ -370,14 +386,21 @@ def test_unix_target_for_linux_and_osx_deps():
             assert "dependencies" in config["target"]["unix"]
             unix_deps = config["target"]["unix"]["dependencies"]
             # X11 packages should be in unix (shared between linux and osx)
-            assert any("x11" in str(dep).lower() or "xorg" in str(dep).lower() for dep in unix_deps.keys())
+            assert any(
+                "x11" in str(dep).lower() or "xorg" in str(dep).lower()
+                for dep in unix_deps.keys()
+            )
 
         # Linux-specific section should have GL packages not in unix
         if "target" in config and "linux" in config["target"]:
             assert "dependencies" in config["target"]["linux"]
             linux_deps = config["target"]["linux"]["dependencies"]
             # GL packages specific to Linux
-            assert any("libgl-devel" in str(dep).lower() or "libopengl-devel" in str(dep).lower() for dep in linux_deps.keys())
+            assert any(
+                "libgl-devel" in str(dep).lower()
+                or "libopengl-devel" in str(dep).lower()
+                for dep in linux_deps.keys()
+            )
 
 
 def test_tasks_have_descriptions():
@@ -410,6 +433,7 @@ def test_tasks_have_descriptions():
 
         # Parse and check tasks
         import tomlkit
+
         with open(toml_path) as f:
             config = tomlkit.load(f)
 
@@ -428,7 +452,7 @@ def test_tasks_have_descriptions():
             },
             "clean": {
                 "cmd": "rm -rf build install log",
-                "description": "Clean build artifacts (build, install, log directories)",
+                "description": "Clean build artifacts (build, install, log dirs)",
             },
         }
 
@@ -439,15 +463,21 @@ def test_tasks_have_descriptions():
             # Task should be a dict/table with cmd and description
             assert isinstance(task, dict), f"Task '{task_name}' should be a dictionary"
             assert "cmd" in task, f"Task '{task_name}' missing 'cmd' field"
-            assert "description" in task, f"Task '{task_name}' missing 'description' field"
+            assert "description" in task, (
+                f"Task '{task_name}' missing 'description' field"
+            )
 
             # Verify the content matches
-            assert task["cmd"] == expected_config["cmd"], f"Task '{task_name}' has wrong command"
-            assert task["description"] == expected_config["description"], f"Task '{task_name}' has wrong description"
+            assert task["cmd"] == expected_config["cmd"], (
+                f"Task '{task_name}' has wrong command"
+            )
+            assert task["description"] == expected_config["description"], (
+                f"Task '{task_name}' has wrong description"
+            )
 
 
 def test_platforms_extended_not_overridden():
-    """Test that running init multiple times extends the platforms list instead of overriding it."""
+    """Test that running init multiple times extends platforms, not overrides them."""
     from pixi_ros.init import init_workspace
 
     with TemporaryDirectory() as tmpdir:
@@ -475,6 +505,7 @@ def test_platforms_extended_not_overridden():
         assert toml_path.exists()
 
         import tomlkit
+
         with open(toml_path) as f:
             config = tomlkit.load(f)
 
@@ -513,7 +544,7 @@ def test_platforms_extended_not_overridden():
 
 
 def test_version_constraints_from_package_xml():
-    """Test that version constraints from package.xml are applied to pixi.toml dependencies."""
+    """Test that version constraints from package.xml are applied to pixi.toml."""
     from pixi_ros.init import init_workspace
 
     with TemporaryDirectory() as tmpdir:
@@ -545,6 +576,7 @@ def test_version_constraints_from_package_xml():
 
         # Parse and check dependencies
         import tomlkit
+
         with open(toml_path) as f:
             config = tomlkit.load(f)
 
@@ -557,25 +589,32 @@ def test_version_constraints_from_package_xml():
         if "cmake" in dependencies:
             cmake_version = dependencies["cmake"]
             assert cmake_version != "*", "cmake should have a version constraint"
-            assert ">=" in cmake_version or "<" in cmake_version, "cmake should have a version constraint operator"
+            assert ">=" in cmake_version or "<" in cmake_version, (
+                "cmake should have a version constraint operator"
+            )
 
         # Check that eigen has the version constraint (>=3.3.0,<4.0.0)
         if "eigen" in dependencies:
             eigen_version = dependencies["eigen"]
             assert eigen_version != "*", "eigen should have a version constraint"
-            assert ">=3.3.0" in eigen_version or ">=" in eigen_version, "eigen should have >= constraint"
+            assert ">=3.3.0" in eigen_version or ">=" in eigen_version, (
+                "eigen should have >= constraint"
+            )
 
         # Check that boost has the exact version constraint (==1.2.3)
         if "boost" in dependencies:
             boost_version = dependencies["boost"]
             assert boost_version != "*", "boost should have a version constraint"
-            assert "==" in boost_version or "1.2.3" in str(boost_version), "boost should have == constraint"
+            assert "==" in boost_version or "1.2.3" in str(boost_version), (
+                "boost should have == constraint"
+            )
 
 
 def test_ros_environment_warning_shown_when_ros_sourced():
     """Test that warning is shown when ROS environment is detected."""
-    from pixi_ros.init import init_workspace
     from rich.console import Console
+
+    from pixi_ros.init import init_workspace
 
     with TemporaryDirectory() as tmpdir:
         workspace_path = Path(tmpdir)
@@ -609,16 +648,21 @@ def test_ros_environment_warning_shown_when_ros_sourced():
             output_text = output.getvalue()
 
             # Check that the warning is present
-            assert "Active ROS environment detected!" in output_text, "Warning about ROS environment should be shown"
+            assert "Active ROS environment detected!" in output_text, (
+                "Warning about ROS environment should be shown"
+            )
             assert "source /opt/ros/" in output_text, "Should mention source /opt/ros/"
-            assert "source install/setup.bash" in output_text, "Should mention source install/setup.bash"
+            assert "source install/setup.bash" in output_text, (
+                "Should mention source install/setup.bash"
+            )
             assert "~/.bashrc" in output_text, "Should mention ~/.bashrc as an example"
 
 
 def test_ros_environment_warning_not_shown_when_not_sourced():
     """Test that warning is NOT shown when ROS environment is not detected."""
-    from pixi_ros.init import init_workspace
     from rich.console import Console
+
+    from pixi_ros.init import init_workspace
 
     with TemporaryDirectory() as tmpdir:
         workspace_path = Path(tmpdir)
@@ -638,8 +682,17 @@ def test_ros_environment_warning_not_shown_when_not_sourced():
 """)
 
         # Make sure ROS environment variables are not set
-        env_without_ros = {k: v for k, v in os.environ.items()
-                          if k not in ["ROS_DISTRO", "ROS_VERSION", "AMENT_PREFIX_PATH", "ROS_PACKAGE_PATH"]}
+        env_without_ros = {
+            k: v
+            for k, v in os.environ.items()
+            if k
+            not in [
+                "ROS_DISTRO",
+                "ROS_VERSION",
+                "AMENT_PREFIX_PATH",
+                "ROS_PACKAGE_PATH",
+            ]
+        }
 
         with patch.dict("os.environ", env_without_ros, clear=True):
             # Capture console output
@@ -655,13 +708,16 @@ def test_ros_environment_warning_not_shown_when_not_sourced():
             output_text = output.getvalue()
 
             # Check that the warning is NOT present
-            assert "Active ROS environment detected!" not in output_text, "Warning should not be shown when ROS is not sourced"
+            assert "Active ROS environment detected!" not in output_text, (
+                "Warning should not be shown when ROS is not sourced"
+            )
 
 
 def test_ros_environment_warning_with_ros_version():
     """Test that warning is shown when ROS_VERSION is set."""
-    from pixi_ros.init import init_workspace
     from rich.console import Console
+
+    from pixi_ros.init import init_workspace
 
     with TemporaryDirectory() as tmpdir:
         workspace_path = Path(tmpdir)
@@ -695,13 +751,16 @@ def test_ros_environment_warning_with_ros_version():
             output_text = output.getvalue()
 
             # Check that the warning is present
-            assert "Active ROS environment detected!" in output_text, "Warning should be shown when ROS_VERSION is set"
+            assert "Active ROS environment detected!" in output_text, (
+                "Warning should be shown when ROS_VERSION is set"
+            )
 
 
 def test_ros_environment_warning_with_ament_prefix_path():
     """Test that warning is shown when AMENT_PREFIX_PATH is set."""
-    from pixi_ros.init import init_workspace
     from rich.console import Console
+
+    from pixi_ros.init import init_workspace
 
     with TemporaryDirectory() as tmpdir:
         workspace_path = Path(tmpdir)
@@ -735,4 +794,6 @@ def test_ros_environment_warning_with_ament_prefix_path():
             output_text = output.getvalue()
 
             # Check that the warning is present
-            assert "Active ROS environment detected!" in output_text, "Warning should be shown when AMENT_PREFIX_PATH is set"
+            assert "Active ROS environment detected!" in output_text, (
+                "Warning should be shown when AMENT_PREFIX_PATH is set"
+            )

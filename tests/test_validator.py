@@ -7,7 +7,6 @@ import pytest
 
 from pixi_ros.validator import (
     PackageSource,
-    PackageValidationResult,
     RosDistroValidator,
 )
 
@@ -15,9 +14,10 @@ from pixi_ros.validator import (
 @pytest.fixture
 def mock_validator():
     """Create a mock validator with stubbed distro data."""
-    with patch("pixi_ros.validator.get_index"), patch(
-        "pixi_ros.validator.get_cached_distribution"
-    ) as mock_distro:
+    with (
+        patch("pixi_ros.validator.get_index"),
+        patch("pixi_ros.validator.get_cached_distribution") as mock_distro,
+    ):
         # Mock the distribution to have a few packages
         mock_dist = MagicMock()
         mock_dist.release_packages = {
@@ -59,8 +59,9 @@ def mock_validator():
 
 def test_validator_initialization():
     """Test that validator initializes with rosdistro."""
-    with patch("pixi_ros.validator.get_index"), patch(
-        "pixi_ros.validator.get_cached_distribution"
+    with (
+        patch("pixi_ros.validator.get_index"),
+        patch("pixi_ros.validator.get_cached_distribution"),
     ):
         validator = RosDistroValidator("humble")
         assert validator.distro_name == "humble"
@@ -93,9 +94,7 @@ def test_validate_workspace_package(mock_validator):
     workspace_packages = {"my_package", "another_package"}
     mappings = {}
 
-    result = mock_validator.validate_package(
-        "my_package", workspace_packages, mappings
-    )
+    result = mock_validator.validate_package("my_package", workspace_packages, mappings)
 
     assert result.package_name == "my_package"
     assert result.source == PackageSource.WORKSPACE
@@ -106,15 +105,9 @@ def test_validate_workspace_package(mock_validator):
 def test_validate_mapped_package_simple(mock_validator):
     """Test validation of mapped packages (simple list)."""
     workspace_packages = set()
-    mappings = {
-        "cmake": {
-            "pixi": ["cmake"]
-        }
-    }
+    mappings = {"cmake": {"pixi": ["cmake"]}}
 
-    result = mock_validator.validate_package(
-        "cmake", workspace_packages, mappings
-    )
+    result = mock_validator.validate_package("cmake", workspace_packages, mappings)
 
     assert result.package_name == "cmake"
     assert result.source == PackageSource.MAPPING
@@ -161,9 +154,7 @@ def test_validate_ros_distro_package(mock_validator):
     workspace_packages = set()
     mappings = {}
 
-    result = mock_validator.validate_package(
-        "rclcpp", workspace_packages, mappings
-    )
+    result = mock_validator.validate_package("rclcpp", workspace_packages, mappings)
 
     assert result.package_name == "rclcpp"
     assert result.source == PackageSource.ROS_DISTRO
@@ -176,9 +167,7 @@ def test_validate_ros_distro_package_with_underscores(mock_validator):
     workspace_packages = set()
     mappings = {}
 
-    result = mock_validator.validate_package(
-        "std_msgs", workspace_packages, mappings
-    )
+    result = mock_validator.validate_package("std_msgs", workspace_packages, mappings)
 
     assert result.package_name == "std_msgs"
     assert result.source == PackageSource.ROS_DISTRO
@@ -195,9 +184,7 @@ def test_validate_conda_forge_package(mock_validator):
     with patch.object(
         mock_validator, "check_conda_forge_availability", return_value=True
     ):
-        result = mock_validator.validate_package(
-            "eigen", workspace_packages, mappings
-        )
+        result = mock_validator.validate_package("eigen", workspace_packages, mappings)
 
         assert result.package_name == "eigen"
         assert result.source == PackageSource.CONDA_FORGE
@@ -228,17 +215,11 @@ def test_validate_not_found_package(mock_validator):
 def test_validation_priority_order(mock_validator):
     """Test that validation follows the correct priority order."""
     workspace_packages = {"test_pkg"}
-    mappings = {
-        "test_pkg": {
-            "pixi": ["mapped-pkg"]
-        }
-    }
+    mappings = {"test_pkg": {"pixi": ["mapped-pkg"]}}
 
     # Even though it's in mappings and might be in ROS distro,
     # workspace packages take priority
-    result = mock_validator.validate_package(
-        "test_pkg", workspace_packages, mappings
-    )
+    result = mock_validator.validate_package("test_pkg", workspace_packages, mappings)
 
     assert result.source == PackageSource.WORKSPACE
 
@@ -264,9 +245,7 @@ def test_check_conda_forge_availability_error(mock_validator):
 def test_validate_package_handles_empty_mapping(mock_validator):
     """Test validation when mapping exists but is empty."""
     workspace_packages = set()
-    mappings = {
-        "empty_pkg": {}
-    }
+    mappings = {"empty_pkg": {}}
 
     # Should fall through to ROS distro check or conda-forge
     with patch.object(
@@ -284,16 +263,12 @@ def test_validate_package_handles_empty_mapping(mock_validator):
 def test_validate_multiple_packages(mock_validator):
     """Test validating multiple packages in sequence."""
     workspace_packages = {"ws_pkg"}
-    mappings = {
-        "cmake": {"pixi": ["cmake"]}
-    }
+    mappings = {"cmake": {"pixi": ["cmake"]}}
 
     # Test without mocking availability (using default mock from fixture)
     results = []
     for pkg in ["ws_pkg", "cmake", "rclcpp", "unknown"]:
-        result = mock_validator.validate_package(
-            pkg, workspace_packages, mappings
-        )
+        result = mock_validator.validate_package(pkg, workspace_packages, mappings)
         results.append(result)
 
     assert results[0].source == PackageSource.WORKSPACE
@@ -308,12 +283,8 @@ def test_validate_ros_distro_package_not_available_in_channels(mock_validator):
     mappings = {}
 
     # Mock check_package_availability to return False for this package
-    with patch.object(
-        mock_validator, "check_package_availability", return_value=False
-    ):
-        result = mock_validator.validate_package(
-            "rclcpp", workspace_packages, mappings
-        )
+    with patch.object(mock_validator, "check_package_availability", return_value=False):
+        result = mock_validator.validate_package("rclcpp", workspace_packages, mappings)
 
     # Package should be marked as NOT_FOUND but include the ROS package name
     assert result.package_name == "rclcpp"
@@ -333,9 +304,10 @@ LOCAL_TEST_CHANNEL = Path(__file__).parent / "data" / "test_channel"
 @pytest.fixture
 def local_channel_validator():
     """Validator that has no rosdistro packages and points at the local test channel."""
-    with patch("pixi_ros.validator.get_index"), patch(
-        "pixi_ros.validator.get_cached_distribution"
-    ) as mock_distro:
+    with (
+        patch("pixi_ros.validator.get_index"),
+        patch("pixi_ros.validator.get_cached_distribution") as mock_distro,
+    ):
         mock_dist = MagicMock()
         mock_dist.release_packages = {}
         mock_distro.return_value = mock_dist
@@ -344,7 +316,7 @@ def local_channel_validator():
             "kilted",
             extra_channels=[LOCAL_TEST_CHANNEL.as_uri()],
         )
-        # Ensure conda-forge check never returns True so we reach the custom channel step
+        # Ensure conda-forge returns False so we fall through to the custom channel step
         validator.check_conda_forge_availability = MagicMock(return_value=False)
         return validator
 
@@ -385,9 +357,10 @@ def test_custom_channel_not_found_returns_not_found(local_channel_validator):
 def test_custom_channel_comes_after_conda_forge():
     """When a package is available on conda-forge it should be resolved there,
     not from the custom channel."""
-    with patch("pixi_ros.validator.get_index"), patch(
-        "pixi_ros.validator.get_cached_distribution"
-    ) as mock_distro:
+    with (
+        patch("pixi_ros.validator.get_index"),
+        patch("pixi_ros.validator.get_cached_distribution") as mock_distro,
+    ):
         mock_dist = MagicMock()
         mock_dist.release_packages = {}
         mock_distro.return_value = mock_dist
@@ -434,7 +407,10 @@ def test_custom_channel_relative_path_resolves(tmp_path, monkeypatch):
     with (
         patch("pixi_ros.validator.get_index"),
         patch("pixi_ros.validator.get_cached_distribution") as mock_distro,
-        patch("pixi_ros.validator.RosDistroValidator.check_conda_forge_availability", return_value=False),
+        patch(
+            "pixi_ros.validator.RosDistroValidator.check_conda_forge_availability",
+            return_value=False,
+        ),
     ):
         mock_dist = MagicMock()
         mock_dist.release_packages = {}
@@ -452,9 +428,10 @@ def test_custom_channel_relative_path_resolves(tmp_path, monkeypatch):
 def test_custom_channel_skipped_when_no_extra_channels():
     """With no extra channels configured the validator should return NOT_FOUND
     rather than checking any custom channel."""
-    with patch("pixi_ros.validator.get_index"), patch(
-        "pixi_ros.validator.get_cached_distribution"
-    ) as mock_distro:
+    with (
+        patch("pixi_ros.validator.get_index"),
+        patch("pixi_ros.validator.get_cached_distribution") as mock_distro,
+    ):
         mock_dist = MagicMock()
         mock_dist.release_packages = {}
         mock_distro.return_value = mock_dist
@@ -467,5 +444,3 @@ def test_custom_channel_skipped_when_no_extra_channels():
         )
 
     assert result.source == PackageSource.NOT_FOUND
-
-

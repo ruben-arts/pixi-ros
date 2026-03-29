@@ -39,14 +39,20 @@ def test_check_ros_jazzy_package():
         records = repo_data_by_channel[0]  # Get records from first channel
         print(f"Number of records in first channel: {len(records)}")
         for record in records:
-            print(f"Found: {record.name} (normalized: {record.name.normalized}) - {record.version}")
+            print(
+                f"Found: {record.name}"
+                f" (normalized: {record.name.normalized})"
+                f" - {record.version}"
+            )
         # Verify we found the package (compare normalized names)
-        package_found = any(record.name.normalized == package_name.lower() for record in records)
+        package_found = any(
+            record.name.normalized == package_name.lower() for record in records
+        )
         assert package_found, f"Package {package_name} not found"
         print(f"\n✓ Package {package_name} found successfully!")
     else:
         print("No records found")
-        assert False, f"Package {package_name} not found in {channel_url}"
+        raise AssertionError(f"Package {package_name} not found in {channel_url}")
 
 
 if __name__ == "__main__":
