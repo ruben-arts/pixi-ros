@@ -14,7 +14,7 @@ test = "pytest tests/ -v"
 lint = "ruff check src/"
 fmt = "ruff format src/"
 check = {depends-on = ["fmt", "lint", "test"]}
-bump = "tbump"
+bump = "tbump --no-push --no-tag --non-interactive"
 
 [package.build.backend]
 name = "pixi-build-python"
