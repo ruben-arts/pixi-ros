@@ -7,12 +7,14 @@ preview = ["pixi-build"]
 pytest = ">=8.0.0"
 ruff = ">=0.6.0"
 pixi-ros = { path = "." }
+tbump = ">=6.9.0,<7"
 
 [tasks]
 test = "pytest tests/ -v"
 lint = "ruff check src/"
 fmt = "ruff format src/"
 check = {depends-on = ["fmt", "lint", "test"]}
+bump = "tbump"
 
 [package.build.backend]
 name = "pixi-build-python"
