@@ -64,3 +64,4 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
 norecursedirs = ["tests/examples"]
+addopts = "--durations=0"
