@@ -58,9 +58,7 @@ class RosDistroValidator:
         if distro_name not in _DISTRO_CACHE:
             try:
                 index = get_index(get_index_url())
-                _DISTRO_CACHE[distro_name] = get_cached_distribution(
-                    index, distro_name
-                )
+                _DISTRO_CACHE[distro_name] = get_cached_distribution(index, distro_name)
             except Exception as e:
                 _DISTRO_CACHE[distro_name] = None
                 self._init_error = str(e)
