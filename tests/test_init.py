@@ -149,6 +149,98 @@ def test_cmake_version_4_and_above():
             )
 
 
+def test_git_files_created_on_init():
+    """Test that .gitignore and .gitattributes are created matching pixi init output."""
+    from pixi_ros.init import init_workspace
+
+    with TemporaryDirectory() as tmpdir:
+        workspace_path = Path(tmpdir)
+        src_dir = workspace_path / "src"
+        src_dir.mkdir()
+        (src_dir / "package.xml").write_text(
+            '<?xml version="1.0"?>'
+            '<package format="3"><name>my_pkg</name><version>0.0.1</version>'
+            "<description>Test</description>"
+            '<maintainer email="a@b.com">A</maintainer>'
+            "<license>MIT</license></package>"
+        )
+
+        init_workspace("humble", workspace_path, platforms=["linux-64"])
+
+        gitignore = workspace_path / ".gitignore"
+        assert gitignore.exists()
+        assert ".pixi/*" in gitignore.read_text()
+        assert "!.pixi/config.toml" in gitignore.read_text()
+
+        gitattributes = workspace_path / ".gitattributes"
+        assert gitattributes.exists()
+        content = gitattributes.read_text()
+        assert "pixi.lock" in content
+        assert "merge=binary" in content
+
+
+def test_git_files_appended_when_lines_missing():
+    """Test that missing pixi lines are appended to existing git files."""
+    from pixi_ros.init import init_workspace
+
+    with TemporaryDirectory() as tmpdir:
+        workspace_path = Path(tmpdir)
+        src_dir = workspace_path / "src"
+        src_dir.mkdir()
+        (src_dir / "package.xml").write_text(
+            '<?xml version="1.0"?>'
+            '<package format="3"><name>my_pkg</name><version>0.0.1</version>'
+            "<description>Test</description>"
+            '<maintainer email="a@b.com">A</maintainer>'
+            "<license>MIT</license></package>"
+        )
+
+        # Pre-create files with custom content that doesn't include pixi lines
+        (workspace_path / ".gitignore").write_text("my-custom-ignore\n")
+        (workspace_path / ".gitattributes").write_text("my-custom-attributes\n")
+
+        init_workspace("humble", workspace_path, platforms=["linux-64"])
+
+        gitignore_content = (workspace_path / ".gitignore").read_text()
+        assert "my-custom-ignore" in gitignore_content
+        assert ".pixi/*" in gitignore_content
+        assert "!.pixi/config.toml" in gitignore_content
+        assert "my-custom-ignore\n\n# pixi environments" in gitignore_content
+
+        gitattributes_content = (workspace_path / ".gitattributes").read_text()
+        assert "my-custom-attributes" in gitattributes_content
+        assert "pixi.lock" in gitattributes_content
+        assert "merge=binary" in gitattributes_content
+        assert "my-custom-attributes\n\n# SCM syntax" in gitattributes_content
+
+
+def test_git_files_not_duplicated_on_reinit():
+    """Test that pixi lines are not duplicated when already present."""
+    from pixi_ros.init import init_workspace
+
+    with TemporaryDirectory() as tmpdir:
+        workspace_path = Path(tmpdir)
+        src_dir = workspace_path / "src"
+        src_dir.mkdir()
+        (src_dir / "package.xml").write_text(
+            '<?xml version="1.0"?>'
+            '<package format="3"><name>my_pkg</name><version>0.0.1</version>'
+            "<description>Test</description>"
+            '<maintainer email="a@b.com">A</maintainer>'
+            "<license>MIT</license></package>"
+        )
+
+        init_workspace("humble", workspace_path, platforms=["linux-64"])
+        init_workspace("humble", workspace_path, platforms=["linux-64"])
+
+        gitignore_content = (workspace_path / ".gitignore").read_text()
+        assert gitignore_content.count(".pixi/*") == 1
+        assert gitignore_content.count("!.pixi/config.toml") == 1
+
+        gitattributes_content = (workspace_path / ".gitattributes").read_text()
+        assert gitattributes_content.count("pixi.lock") == 1
+
+
 def test_platforms_added_to_workspace_single_platform():
     """Test that single platform is added to workspace section."""
     from pixi_ros.init import init_workspace
