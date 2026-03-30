@@ -59,6 +59,18 @@ packages = ["src/pixi_ros"]
 [tool.hatchling.build.targets.wheel.force-include]
 "src/pixi_ros/data" = "pixi_ros/data"
 
+[tool.tbump.version]
+current = "0.5.0"
+regex = "\\d+\\.\\d+\\.\\d+"
+
+[tool.tbump.git]
+message_template = "Bump to {new_version}"
+tag_template = "v{new_version}"
+
+[[tool.tbump.file]]
+src = "pyproject.toml"
+search = 'version = "{current_version}"'
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
