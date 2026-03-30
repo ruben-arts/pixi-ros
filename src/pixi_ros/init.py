@@ -138,6 +138,7 @@ def init_workspace(
 
         # Create README_PIXI.md to help users
         _create_readme(workspace_path, distro)
+        _create_git_files(workspace_path)
         typer.secho(
             f"✓ Successfully initialized {pixi_toml_path}", fg="green", bold=True
         )
@@ -997,3 +998,38 @@ def _create_readme(workspace_path: Path, distro: str):
     except Exception as e:
         # Don't fail if we can't create the README
         typer.echo(f"Warning: Could not create README_PIXI.md: {e}", err=True)
+
+
+def _create_git_files(workspace_path: Path):
+    """Ensure .gitignore and .gitattributes contain the lines pixi init generates.
+
+    Appends any missing lines to existing files rather than overwriting them.
+    """
+    gitignore = workspace_path / ".gitignore"
+    gitignore_lines = [".pixi/*", "!.pixi/config.toml"]
+    try:
+        existing = gitignore.read_text() if gitignore.exists() else ""
+        missing = [ln for ln in gitignore_lines if ln not in existing.splitlines()]
+        if missing:
+            prefix = "\n# pixi environments\n" if existing else "# pixi environments\n"
+            with open(gitignore, "a") as f:
+                f.write(prefix + "\n".join(missing) + "\n")
+    except Exception as e:
+        typer.echo(f"Warning: Could not update .gitignore: {e}", err=True)
+
+    gitattributes = workspace_path / ".gitattributes"
+    gitattributes_line = (
+        "pixi.lock merge=binary linguist-language=YAML linguist-generated=true -diff"
+    )
+    try:
+        existing = gitattributes.read_text() if gitattributes.exists() else ""
+        if gitattributes_line not in existing:
+            prefix = (
+                "\n# SCM syntax highlighting & preventing 3-way merges\n"
+                if existing
+                else "# SCM syntax highlighting & preventing 3-way merges\n"
+            )
+            with open(gitattributes, "a") as f:
+                f.write(prefix + gitattributes_line + "\n")
+    except Exception as e:
+        typer.echo(f"Warning: Could not update .gitattributes: {e}", err=True)
