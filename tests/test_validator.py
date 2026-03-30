@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+import pixi_ros.validator as validator_module
 from pixi_ros.validator import (
     PackageSource,
     RosDistroValidator,
@@ -67,8 +68,9 @@ def test_validator_initialization():
         assert validator.distro_name == "humble"
 
 
-def test_validator_initialization_error():
+def test_validator_initialization_error(monkeypatch):
     """Test that validator handles rosdistro initialization errors."""
+    monkeypatch.setattr(validator_module, "_DISTRO_CACHE", {})
     with patch("pixi_ros.validator.get_index", side_effect=Exception("Network error")):
         validator = RosDistroValidator("humble")
         assert validator._init_error is not None
@@ -82,8 +84,9 @@ def test_has_package_success(mock_validator):
     assert not mock_validator.has_package("unknown_package")
 
 
-def test_has_package_when_distro_not_loaded():
+def test_has_package_when_distro_not_loaded(monkeypatch):
     """Test has_package returns False when distro failed to load."""
+    monkeypatch.setattr(validator_module, "_DISTRO_CACHE", {})
     with patch("pixi_ros.validator.get_index", side_effect=Exception("Network error")):
         validator = RosDistroValidator("humble")
         assert not validator.has_package("rclcpp")
