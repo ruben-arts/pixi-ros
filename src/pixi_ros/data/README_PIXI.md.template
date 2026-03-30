@@ -2,144 +2,103 @@
 
 This ROS {distro} workspace is configured to use [Pixi](https://pixi.sh) for dependency management.
 
-## What is Pixi?
-
-Pixi is a modern package manager that uses conda packages. It provides:
-- Fast, reproducible dependency resolution
-- Automatic environment management
-- Reproducible with a lockfile
-- Cross-platform support (Linux, macOS, Windows)
-
 ## Getting Started
 
-### 1. Install Dependencies
+### 1. Install dependencies
 
 ```bash
 pixi install
 ```
 
-This installs all dependencies specified in `pixi.toml` from the configured channels.
-
-### 2. Build the Workspace
+### 2. Build the workspace
 
 ```bash
 pixi run build
 ```
 
-This runs `colcon build` to compile your ROS packages.
-
-### 3. Run Tests
+### 3. Run tests
 
 ```bash
 pixi run test
 ```
 
-This runs `colcon test` to execute your test suite.
-
-### 4. Clean Build Artifacts
-
-```bash
-pixi run clean
-```
-
-Removes `build/`, `install/`, and `log/` directories.
-
-### 5. Add additional dependencies
-
-```bash
-pixi add <package-name>
-# or for packages you would install with pip/uv/poetry:
-pixi add --pypi <package-name>
-```
-
-This adds new dependencies to `pixi.toml` and installs them.
-
-## Environment Activation
-
-After the first build, pixi will automatically source the ROS setup script (`install/setup.bash`)
-when you enter the pixi environment. This means you don't need to manually source it!
-
-To activate the environment, run:
+### 4. Activate the environment
 
 ```bash
 pixi shell
 ```
 
-This starts a new shell with the ROS environment activated.
+This starts a new shell with the ROS environment activated. You can also prefix any command
+with `pixi run <command>` without entering the shell.
 
-The environment will also be automatically activated when you run commands with `pixi run <command>`.
+> **Note:** After the first `pixi run build`, pixi will automatically source
+> `install/setup.bash` on environment activation. This means all your built packages
+> are available without any manual sourcing.
 
-## Adding Dependencies
+## Adding dependencies
 
-### Add a Conda Package
-
-```bash
-pixi add <package-name>
-```
-
-### Add ROS Dependencies
-
-When you add dependencies to your `package.xml` files, run:
+When you add dependencies to your `package.xml` files, re-run `pixi ros init` to update `pixi.toml`:
 
 ```bash
 pixi ros init --distro {distro}
 ```
 
-This will update `pixi.toml` with the new dependencies.
+To add a conda package directly:
 
-## Unavailable Packages
+```bash
+pixi add <package-name>
+```
 
-If you see commented-out packages in `pixi.toml` with `# NOT FOUND`, these packages
-were not found in the configured channels. You may need to:
-- Check if the package name is correct
-- Add additional channels with `pixi project channel add <channel-url>`
-- Install the package through pip: `pixi add --pypi <package-name>`
-- Contribute the package to [conda-forge](https://github.com/conda-forge/staged-recipes) or RoboStack:
-  - [ros-humble](https://github.com/RoboStack/ros-humble)
-  - [ros-jazzy](https://github.com/RoboStack/ros-jazzy)
-  - [ros-kilted](https://github.com/RoboStack/ros-kilted)
+To add a PyPI package:
 
-## Common Issues
+```bash
+pixi add --pypi <package-name>
+```
 
-### Build Fails
+## Unavailable packages
 
-If `pixi run build` fails:
+If `pixi.toml` contains commented-out lines marked `# NOT FOUND`, those packages could not be
+resolved from the default channels. Options:
+
+1. **Use a custom channel** — re-run init with `--channel` if the package lives elsewhere:
+   ```bash
+   pixi ros init --distro {distro} --channel https://prefix.dev/my-channel
+   ```
+2. **Add the channel manually** — `pixi project channel add <channel-url>`
+3. **Check the package name** — verify spelling in your `package.xml`
+4. **Install via PyPI** — `pixi add --pypi <package-name>`
+5. **Contribute to RoboStack** — if the package is missing from the default ROS channel:
+   - [ros-humble](https://github.com/RoboStack/ros-humble)
+   - [ros-jazzy](https://github.com/RoboStack/ros-jazzy)
+   - [ros-kilted](https://github.com/RoboStack/ros-kilted)
+
+## Common issues
+
+### Build fails
+
 1. Make sure all dependencies are installed: `pixi install`
 2. Clean and rebuild: `pixi run clean && pixi run build`
-3. Validate the build task is correct for your workspace.
 
-### Environment Issues
+### `ros2` commands not found
 
-If `ros2` commands aren't found:
-1. Run commands through pixi: `pixi run <command>`
-2. Or use a pixi shell: `pixi shell`
+Run commands through pixi: `pixi run <command>` or enter the shell with `pixi shell`.
 
-### Active ROS Environment Conflicts
+### Active ROS environment conflict
 
-If you see a warning about an "Active ROS environment detected" during initialization, it means you have an existing ROS environment sourced in your shell. This can cause conflicts with pixi's managed environment.
+If `pixi ros init` warns about an "Active ROS environment detected", you have a ROS installation
+sourced in your shell. Remove or comment out any lines like the following from `~/.bashrc` or
+`~/.zshrc` and restart your shell:
 
-**The problem:** Environment variables like `ROS_DISTRO`, `AMENT_PREFIX_PATH`, or `ROS_PACKAGE_PATH` from a manually sourced ROS installation can interfere with pixi's environment management.
+```bash
+# source /opt/ros/{distro}/setup.bash
+# source ~/ros_ws/install/setup.bash
+```
 
-**The solution:**
-1. Open your shell configuration file (`~/.bashrc`, `~/.zshrc`, etc.)
-2. Remove or comment out lines that source ROS:
-   ```bash
-   # source /opt/ros/{distro}/setup.bash
-   # source ~/ros_ws/install/setup.bash
-   ```
-3. Restart your shell or run `source ~/.bashrc`
+Pixi manages the ROS environment automatically — no manual sourcing needed.
 
-Pixi automatically manages the ROS environment for you - no manual sourcing needed!
+## Learn more
 
-## Learn More
-
-- **Pixi Documentation**: https://pixi.sh
-- **RoboStack Documentation**: https://robostack.github.io/
-- **ROS {distro} Documentation**: https://docs.ros.org/en/{distro}/
-- **pixi-ros GitHub**: https://github.com/prefix-dev/pixi-ros
-
-## Channels
-
-This workspace uses the following channels:
-- `https://prefix.dev/robostack-{distro}` - ROS packages
-- `https://prefix.dev/conda-forge` - System dependencies
+- [Pixi documentation](https://pixi.sh)
+- [RoboStack](https://robostack.github.io/)
+- [ROS {distro} documentation](https://docs.ros.org/en/{distro}/)
+- [pixi-ros](https://github.com/prefix-dev/pixi-ros)

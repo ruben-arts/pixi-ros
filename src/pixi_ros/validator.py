@@ -3,9 +3,16 @@
 import asyncio
 from dataclasses import dataclass
 from enum import Enum
+from typing import Any
 
 from rattler import Channel, Gateway, Platform
 from rosdistro import get_cached_distribution, get_index, get_index_url
+
+# In-process cache: distro_name -> distribution object (or None on error).
+# get_index() makes a network call every time; get_cached_distribution()
+# caches the network fetch to disk but still re-reads and re-parses on each
+# call (~1-2s). This cache eliminates both costs after the first instantiation.
+_DISTRO_CACHE: dict[str, Any] = {}
 
 
 class PackageSource(Enum):
@@ -48,11 +55,15 @@ class RosDistroValidator:
         self._init_error = None
         self._conda_forge_cache = {}
 
-        try:
-            index = get_index(get_index_url())
-            self._distro = get_cached_distribution(index, distro_name)
-        except Exception as e:
-            self._init_error = str(e)
+        if distro_name not in _DISTRO_CACHE:
+            try:
+                index = get_index(get_index_url())
+                _DISTRO_CACHE[distro_name] = get_cached_distribution(index, distro_name)
+            except Exception as e:
+                _DISTRO_CACHE[distro_name] = None
+                self._init_error = str(e)
+
+        self._distro = _DISTRO_CACHE.get(distro_name)
 
     def has_package(self, package_name: str) -> bool:
         """
