@@ -345,7 +345,10 @@ libhdf5-dev:
 libi2c-dev:
   pixi: [libi2c]
 liblttng-ust-dev:
-  pixi: ["${{ \"lttng-ust\" if linux }}"]
+  pixi:
+    linux: [lttng-ust]
+    osx: []
+    win64: []
 libjpeg:
   pixi: [libjpeg-turbo]
 libjsoncpp:
