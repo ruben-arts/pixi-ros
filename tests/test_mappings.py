@@ -70,6 +70,8 @@ def test_get_ros_distros():
     assert "humble" in distros
     assert "jazzy" in distros
     assert "kilted" in distros
+    assert "lyrical" in distros
+    assert "rolling" in distros
     assert isinstance(distros, list)
 
 
@@ -79,6 +81,8 @@ def test_validate_distro():
     assert validate_distro("humble")
     assert validate_distro("jazzy")
     assert validate_distro("kilted")
+    assert validate_distro("lyrical")
+    assert validate_distro("rolling")
     assert not validate_distro("invalid")
     assert not validate_distro("iron")  # Not in current list
 

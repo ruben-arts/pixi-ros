@@ -310,7 +310,7 @@ def get_ros_distros() -> list[str]:
     Returns:
         List of ROS distro names
     """
-    return ["foxy", "humble", "jazzy", "kilted"]
+    return ["foxy", "humble", "jazzy", "kilted", "lyrical", "rolling"]
 
 
 def validate_distro(distro: str) -> bool:
