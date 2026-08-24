@@ -28,6 +28,7 @@ def init_workspace(
     workspace_path: Path | None = None,
     platforms: list[str] | None = None,
     channels: list[str] | None = None,
+    dev: bool = False,
 ) -> bool:
     """
     Initialize or update pixi.toml for a ROS workspace.
@@ -123,11 +124,13 @@ def init_workspace(
     not_found_packages = _display_dependencies(packages, distro, validator)
 
     # Update configuration
-    _ensure_workspace_section(pixi_config, workspace_path, platforms)
+    _ensure_workspace_section(pixi_config, workspace_path, platforms, dev=dev)
     _ensure_channels(pixi_config, distro, channels)
     _ensure_dependencies(
-        pixi_config, packages, distro, platforms, validator, not_found_packages
+        pixi_config, packages, distro, platforms, validator, not_found_packages, dev=dev
     )
+    if dev:
+        _ensure_dev_source_dependencies(pixi_config, packages, distro, workspace_path)
     _ensure_tasks(pixi_config)
     _ensure_activation(pixi_config)
 
@@ -451,7 +454,10 @@ def _display_dependencies(packages, distro: str, validator=None):
 
 
 def _ensure_workspace_section(
-    config: dict, workspace_path: Path, platforms: list[str] | None = None
+    config: dict,
+    workspace_path: Path,
+    platforms: list[str] | None = None,
+    dev: bool = False,
 ):
     """Ensure workspace section exists with basic config."""
     if "workspace" not in config:
@@ -462,6 +468,12 @@ def _ensure_workspace_section(
     # Set name if not present
     if "name" not in workspace:
         workspace["name"] = workspace_path.name
+
+    # pixi-build preview is required for source dependencies in [dev]
+    if dev:
+        existing_preview = workspace.get("preview", [])
+        if "pixi-build" not in existing_preview:
+            workspace["preview"] = list(existing_preview) + ["pixi-build"]
 
     # Set channels if not present
     if "channels" not in workspace:
@@ -523,6 +535,7 @@ def _ensure_dependencies(
     platforms: list[str] | None = None,
     validator=None,
     not_found_from_display: dict[str, tuple[set[str], list[str]]] | None = None,
+    dev: bool = False,
 ):
     """
     Ensure all ROS dependencies are present with comments showing source.
@@ -751,51 +764,56 @@ def _ensure_dependencies(
     if "cmake" in dep_versions and "cmake" not in dependencies:
         dependencies["cmake"] = dep_versions["cmake"]
 
-    # Add package dependencies
-    # Add common dependencies (available on all platforms)
-    if dep_sources:
-        dependencies.add(tomlkit.nl())
+    if not dev:
+        # Add package dependencies
+        # Add common dependencies (available on all platforms)
+        if dep_sources:
+            dependencies.add(tomlkit.nl())
+            if len(mapping_platform_list) > 1:
+                dependencies.add(
+                    tomlkit.comment("Workspace dependencies (common across platforms)")
+                )
+            else:
+                dependencies.add(tomlkit.comment("Workspace dependencies"))
+
+            # Add all dependencies (validation already checked availability)
+            for conda_dep in sorted(dep_sources.keys()):
+                if conda_dep not in dependencies:
+                    version = dep_versions.get(conda_dep, "*")
+                    dependencies[conda_dep] = version
+
+        # Add NOT_FOUND packages as comments (common across all platforms)
         if len(mapping_platform_list) > 1:
-            dependencies.add(
-                tomlkit.comment("Workspace dependencies (common across platforms)")
-            )
+            if common_not_found:
+                dependencies.add(tomlkit.nl())
+                dependencies.add(
+                    tomlkit.comment("The following packages were not found:")
+                )
+                for ros_pkg in sorted(common_not_found):
+                    _, conda_pkgs = not_found_packages[mapping_platform_list[0]][
+                        ros_pkg
+                    ]
+                    pkg_name = conda_pkgs[0] if conda_pkgs else ros_pkg
+                    dependencies.add(tomlkit.comment(f'{pkg_name} = "*"'))
         else:
-            dependencies.add(tomlkit.comment("Workspace dependencies"))
-
-        # Add all dependencies (validation already checked availability)
-        for conda_dep in sorted(dep_sources.keys()):
-            if conda_dep not in dependencies:
-                version = dep_versions.get(conda_dep, "*")
-                dependencies[conda_dep] = version
-
-    # Add NOT_FOUND packages as comments (common across all platforms)
-    if len(mapping_platform_list) > 1:
-        if common_not_found:
-            dependencies.add(tomlkit.nl())
-            dependencies.add(tomlkit.comment("The following packages were not found:"))
-            for ros_pkg in sorted(common_not_found):
-                _, conda_pkgs = not_found_packages[mapping_platform_list[0]][ros_pkg]
-                # Use conda package name if available, otherwise ros package name
-                pkg_name = conda_pkgs[0] if conda_pkgs else ros_pkg
-                dependencies.add(tomlkit.comment(f'{pkg_name} = "*"'))
-    else:
-        # Single platform - add all NOT_FOUND packages
-        mapping_platform = mapping_platform_list[0]
-        if not_found_packages[mapping_platform]:
-            dependencies.add(tomlkit.nl())
-            dependencies.add(tomlkit.comment("The following packages were not found:"))
-            for ros_pkg in sorted(not_found_packages[mapping_platform].keys()):
-                _, conda_pkgs = not_found_packages[mapping_platform][ros_pkg]
-                # Use conda package name if available, otherwise ros package name
-                pkg_name = conda_pkgs[0] if conda_pkgs else ros_pkg
-                dependencies.add(tomlkit.comment(f'{pkg_name} = "*"'))
+            # Single platform - add all NOT_FOUND packages
+            mapping_platform = mapping_platform_list[0]
+            if not_found_packages[mapping_platform]:
+                dependencies.add(tomlkit.nl())
+                dependencies.add(
+                    tomlkit.comment("The following packages were not found:")
+                )
+                for ros_pkg in sorted(not_found_packages[mapping_platform].keys()):
+                    _, conda_pkgs = not_found_packages[mapping_platform][ros_pkg]
+                    pkg_name = conda_pkgs[0] if conda_pkgs else ros_pkg
+                    dependencies.add(tomlkit.comment(f'{pkg_name} = "*"'))
 
     config["dependencies"] = dependencies
 
     # Add platform-specific dependencies if multiple mapping platforms
     # First, identify unix dependencies (available on both linux and osx, but not win)
     unix_deps = {}
-    if len(mapping_platform_list) > 1:
+    if not dev and len(mapping_platform_list) > 1:
         has_linux = "linux" in mapping_platform_list
         has_osx = "osx" in mapping_platform_list
         has_win = "win64" in mapping_platform_list or "win" in mapping_platform_list
@@ -869,7 +887,7 @@ def _ensure_dependencies(
                         target_deps.add(tomlkit.comment(f'{pkg_name} = "*"'))
 
     # Now add remaining platform-specific dependencies (not in common, not in unix)
-    if len(mapping_platform_list) > 1:
+    if not dev and len(mapping_platform_list) > 1:
         for mapping_platform in mapping_platform_list:
             platform_specific_deps = {
                 dep: sources
@@ -924,6 +942,41 @@ def _ensure_dependencies(
                         _, conda_pkgs = platform_not_found[ros_pkg]
                         pkg_name = conda_pkgs[0] if conda_pkgs else ros_pkg
                         target_deps.add(tomlkit.comment(f'{pkg_name} = "*"'))
+
+
+def _ensure_dev_source_dependencies(
+    config: dict,
+    packages,
+    distro: str,
+    workspace_path: Path,
+):
+    """Add workspace packages as source dependencies in the [dev] table.
+
+    Each package is represented as:
+        ros-{distro}-{package-name} = { path = "relative/path/to/package.xml" }
+
+    Pixi resolves the actual conda dependencies from the package.xml at install time.
+    """
+    if not packages:
+        return
+
+    if "dev" not in config:
+        config["dev"] = tomlkit.table()
+    dev_table = config["dev"]
+
+    if len(dev_table) == 0:
+        dev_table.add(tomlkit.comment("Workspace source dependencies"))
+
+    for pkg in sorted(packages, key=lambda p: p.name):
+        conda_name = f"ros-{distro}-{pkg.name.replace('_', '-')}"
+        relative_path = str(pkg.path.relative_to(workspace_path))
+
+        if conda_name not in dev_table:
+            source_table = tomlkit.inline_table()
+            source_table.append("path", relative_path)
+            dev_table[conda_name] = source_table
+
+    config["dev"] = dev_table
 
 
 def _ensure_tasks(config: dict):

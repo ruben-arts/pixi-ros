@@ -677,6 +677,111 @@ def test_version_constraints_from_package_xml():
             )
 
 
+def test_dev_flag_adds_source_deps_to_dev_table():
+    """Test that --dev mode adds workspace packages as source deps in [dev] table."""
+    from pixi_ros.init import init_workspace
+
+    with TemporaryDirectory() as tmpdir:
+        workspace_path = Path(tmpdir)
+        src_dir = workspace_path / "src" / "my_pkg"
+        src_dir.mkdir(parents=True)
+
+        pkg_xml = src_dir / "package.xml"
+        pkg_xml.write_text("""<?xml version="1.0"?>
+<package format="2">
+    <name>my_pkg</name>
+    <version>0.0.1</version>
+    <description>Test package</description>
+    <maintainer email="test@test.com">Test</maintainer>
+    <license>MIT</license>
+    <depend>rclcpp</depend>
+</package>
+""")
+
+        init_workspace("humble", workspace_path, platforms=["linux-64"], dev=True)
+
+        import tomlkit
+
+        toml_path = workspace_path / "pixi.toml"
+        with open(toml_path) as f:
+            config = tomlkit.load(f)
+
+        # [dev] table must exist with a source entry for the workspace package
+        assert "dev" in config, "[dev] table should be present in dev mode"
+        dev_table = config["dev"]
+        assert "ros-humble-my-pkg" in dev_table, (
+            "workspace package should be listed in [dev]"
+        )
+        entry = dev_table["ros-humble-my-pkg"]
+        assert "path" in entry, "source entry should have a 'path' key"
+        assert entry["path"].endswith("package.xml"), (
+            "path should point to package.xml"
+        )
+
+        # workspace-derived transitive deps (e.g. rclcpp) must NOT be in [dependencies]
+        dependencies = config.get("dependencies", {})
+        ros_humble_rclcpp = "ros-humble-rclcpp"
+        assert ros_humble_rclcpp not in dependencies, (
+            "transitive workspace deps should not be in [dependencies] in dev mode"
+        )
+
+        # Base ROS deps and build tools must still be present
+        assert "ros-humble-ros-base" in dependencies, (
+            "base ROS dep should always be added"
+        )
+        assert "colcon-common-extensions" in dependencies, (
+            "build tools should always be added"
+        )
+
+        # pixi-build preview must be enabled so pixi can resolve source deps
+        workspace = config["workspace"]
+        assert "preview" in workspace, (
+            "[workspace] should have 'preview' in dev mode"
+        )
+        assert "pixi-build" in workspace["preview"], (
+            "'pixi-build' must be in preview list for source dependencies to work"
+        )
+
+
+def test_dev_flag_path_is_relative_to_workspace():
+    """Test that source dep paths in [dev] are relative to the workspace root."""
+    from pixi_ros.init import init_workspace
+
+    with TemporaryDirectory() as tmpdir:
+        workspace_path = Path(tmpdir)
+        src_dir = workspace_path / "src" / "nested" / "pkg_a"
+        src_dir.mkdir(parents=True)
+
+        pkg_xml = src_dir / "package.xml"
+        pkg_xml.write_text("""<?xml version="1.0"?>
+<package format="2">
+    <name>pkg_a</name>
+    <version>0.0.1</version>
+    <description>Test</description>
+    <maintainer email="test@test.com">Test</maintainer>
+    <license>MIT</license>
+</package>
+""")
+
+        init_workspace("jazzy", workspace_path, platforms=["linux-64"], dev=True)
+
+        import tomlkit
+
+        with open(workspace_path / "pixi.toml") as f:
+            config = tomlkit.load(f)
+
+        dev_table = config["dev"]
+        assert "ros-jazzy-pkg-a" in dev_table
+        path_value = dev_table["ros-jazzy-pkg-a"]["path"]
+        # Path must be relative (not absolute)
+        assert not Path(path_value).is_absolute(), "path should be relative"
+        # Path must end at package.xml
+        assert path_value.endswith("package.xml")
+        # Verify it resolves correctly
+        resolved = (workspace_path / path_value).resolve()
+        assert resolved == pkg_xml.resolve()
+
+
 def test_ros_environment_warning_shown_when_ros_sourced():
     """Test that warning is shown when ROS environment is detected."""
     from rich.console import Console

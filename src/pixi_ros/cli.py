@@ -50,6 +50,15 @@ def init(
             " Can be specified multiple times. Added before default channels.",
         ),
     ] = None,
+    dev: Annotated[
+        bool,
+        typer.Option(
+            "--dev",
+            help="Add workspace packages as source dependencies in [dev] table"
+            " (pointing to their package.xml) instead of resolving all transitive"
+            " dependencies into [dependencies]. Pixi will resolve them at install time.",
+        ),
+    ] = False,
 ):
     """Initialize pixi.toml for a ROS workspace."""
     # If distro not provided, prompt user to select one
@@ -148,7 +157,7 @@ def init(
                 typer.echo("Error: No platforms selected", err=True)
                 raise typer.Exit(code=1)
 
-    init_workspace(distro, platforms=platforms, channels=channels)
+    init_workspace(distro, platforms=platforms, channels=channels, dev=dev)
 
 
 def main():
