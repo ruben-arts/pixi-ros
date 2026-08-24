@@ -2,8 +2,7 @@
 
 from dataclasses import dataclass, field
 from pathlib import Path
-
-from lxml import etree
+from xml.etree import ElementTree
 
 
 @dataclass
@@ -57,9 +56,9 @@ class PackageXML:
             raise FileNotFoundError(f"package.xml not found at {path}")
 
         try:
-            tree = etree.parse(str(path))
+            tree = ElementTree.parse(path)
             root = tree.getroot()
-        except etree.XMLSyntaxError as e:
+        except ElementTree.ParseError as e:
             raise ValueError(f"Invalid XML in {path}: {e}") from e
 
         # Get format version (defaults to 1 if not specified)
