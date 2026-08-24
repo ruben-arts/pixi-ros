@@ -71,6 +71,8 @@ resolved from the default channels. Options:
    - [ros-humble](https://github.com/RoboStack/ros-humble)
    - [ros-jazzy](https://github.com/RoboStack/ros-jazzy)
    - [ros-kilted](https://github.com/RoboStack/ros-kilted)
+   - [ros-lyrical](https://github.com/RoboStack/ros-lyrical)
+   - [ros-rolling](https://github.com/RoboStack/ros-rolling)
 
 ## Common issues
 
