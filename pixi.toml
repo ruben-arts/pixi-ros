@@ -4,8 +4,8 @@ platforms = ["osx-arm64", "linux-64", "osx-64", "win-64"]
 preview = ["pixi-build"]
 
 [dependencies]
-pytest = ">=8.0.0"
-ruff = ">=0.6.0"
+pytest = ">=9.1.1,<10"
+ruff = ">=0.16.4,<0.17"
 pixi-ros = { path = "." }
 tbump = ">=6.9.0,<7"
 
