@@ -56,7 +56,8 @@ def init(
             "--dev",
             help="Add workspace packages as source dependencies in [dev] table"
             " (pointing to their package.xml) instead of resolving all transitive"
-            " dependencies into [dependencies]. Pixi will resolve them at install time.",
+            " dependencies into [dependencies]."
+            " Pixi will resolve them at install time.",
         ),
     ] = False,
 ):
