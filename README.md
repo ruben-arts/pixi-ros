@@ -387,6 +387,8 @@ If pixi-ros marks packages as "NOT FOUND" (shown in red in the validation output
    - [ros-humble](https://github.com/RoboStack/ros-humble) (ROS 2)
    - [ros-jazzy](https://github.com/RoboStack/ros-jazzy) (ROS 2)
    - [ros-kilted](https://github.com/RoboStack/ros-kilted) (ROS 2)
+   - [ros-lyrical](https://github.com/RoboStack/ros-lyrical) (ROS 2)
+   - [ros-rolling](https://github.com/RoboStack/ros-rolling) (ROS 2)
 
 The validation table shows exactly where each dependency was checked, making it easier to diagnose issues.
 
