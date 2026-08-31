@@ -37,6 +37,11 @@ cartographer:
   pixi: [cartographer]
 ca-certificates:
   pixi: [ca-certificates]
+chrony:
+  pixi:
+    linux: [chrony]
+    osx: []
+    win64: []
 clang-format:
   pixi: [clang-format]
 clang-tidy:
@@ -68,6 +73,8 @@ crypto++:
   pixi: [cryptopp]
 curl:
   pixi: [libcurl]
+curlpp-dev:
+  pixi: [curlpp]
 cython:
   pixi: [cython]
 doxygen:
@@ -76,6 +83,8 @@ draco:
   pixi: [draco]
 eigen:
   pixi: [eigen]
+libdraco-dev:
+  pixi: [draco]
 emacs:
   # Wait until https://github.com/pixi-forge/gtk3-feedstock/pull/74 is resolved
   # and emacs is rebuilt for harfbuzz=10
@@ -318,6 +327,8 @@ libglew-dev:
   pixi: [glew]
 libglfw3-dev:
   pixi: [glfw 3.*]
+libgmock-dev:
+  pixi: [gmock]
 libglu-dev:
   pixi:
     linux: [libglu]
@@ -461,6 +472,8 @@ libsqlite3-dev:
   pixi: [sqlite 3.*]
 libssl-dev:
   pixi: [openssl]
+libsystemd-dev:
+  pixi: [libsystemd]
 libtheora:
   pixi: [libtheora]
 libtool:
@@ -729,6 +742,8 @@ python3-bson:
   pixi: [pymongo]
 python3-cairo:
   pixi: [pycairo]
+python3-cantools-pip:
+  pixi: [cantools]
 python3-catkin-pkg:
   pixi: [catkin_pkg]
 python3-catkin-pkg-modules:
@@ -767,6 +782,8 @@ python3-flask:
   pixi: [flask]
 python3-flask-cors:
   pixi: [flask-cors]
+python3-fastapi:
+  pixi: [fastapi]
 python3-fiona:
   pixi: [fiona]
 python3-future:
@@ -849,6 +866,8 @@ python3-pycodestyle:
   pixi: [pycodestyle]
 python3-pycryptodome:
   pixi: [pycryptodome, pycryptodomex]
+python3-pydantic:
+  pixi: [pydantic]
 python3-pydot:
   pixi: [pydot]
 python3-pygraphviz:
@@ -921,6 +940,8 @@ python3-tk:
   pixi: [tk]
 python3-torch:
   pixi: [pytorch]
+python3-torchvision-pip:
+  pixi: [torchvision]
 python3-tornado:
   pixi: [tornado]
 python3-transforms3d:
@@ -953,6 +974,10 @@ python3-yaml:
   pixi: [pyyaml]
 python3-zmq:
   pixi: [pyzmq]
+python3-ultralytics-pip:
+  pixi: [ultralytics]
+python3-uvicorn:
+  pixi: [uvicorn]
 qt5-image-formats-plugins:
   pixi: [qt-main, REQUIRE_OPENGL]
 qt5-qmake:
@@ -965,6 +990,8 @@ roboticstoolbox-python:
   pixi: [roboticstoolbox-python]
 rsync:
   pixi: [rsync]
+range-v3:
+  pixi: [range-v3]
 rti-connext-dds-5.3.1:
   pixi: []
 ruby:
@@ -986,6 +1013,8 @@ sdl-image:
   pixi: [sdl_image]
 sdl2:
   pixi: [sdl2]
+smartmontools:
+  pixi: [smartmontools]
 socat:
   pixi: [socat]
 spacenavd:
@@ -998,6 +1027,8 @@ subversion:
   pixi: [subversion]
 suitesparse:
   pixi: [suitesparse]
+sophus:
+  pixi: [sophus]
 sqlite3:
   pixi: [sqlite 3.*]
 swig:
