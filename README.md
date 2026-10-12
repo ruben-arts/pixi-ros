@@ -206,6 +206,7 @@ pixi-ros init
 - `--channel`, `-c`: Additional channels to search for packages (optional, can be specified multiple times)
   - Accepts URLs (`https://prefix.dev/my-channel`) or local paths (`./my-channel`, `~/channels/my-channel`)
   - Channels are added to `pixi.toml` with higher priority than the default robostack and conda-forge channels
+- `--dev`: Add workspace packages as source dependencies in the `[dev]` table instead of resolving their dependencies into `[dependencies]` (see [Development Mode](#development-mode---dev))
 
 **What it does:**
 - Scans workspace for `package.xml` files
@@ -340,6 +341,50 @@ channels = [
     "https://prefix.dev/conda-forge",
 ]
 ```
+
+## Development Mode (`--dev`)
+
+By default, `pixi-ros init` reads every `package.xml`, resolves the dependencies itself, and writes them to `[dependencies]`.
+With `--dev`, it lists your workspace packages as source dependencies in Pixi's `[dev]` table instead, and Pixi reads their `package.xml` files at install time.
+
+```bash
+pixi-ros init --distro humble --dev
+```
+
+Generates:
+
+```toml
+[workspace]
+name = "my_workspace"
+preview = ["pixi-build"]
+channels = ["https://prefix.dev/robostack-humble", "https://prefix.dev/conda-forge"]
+platforms = ["linux-64"]
+
+[dependencies]
+# Base ROS dependencies
+ros-humble-ros-base = "*"
+pkg-config = "*"
+compilers = "*"
+make = "*"
+ninja = "*"
+ros-humble-ros2cli = "*"
+
+# Build tools
+colcon-common-extensions = "*"
+
+[dev]
+# Workspace source dependencies
+ros-humble-my-package = {path = "src/my_package/package.xml"}
+```
+
+In this mode:
+- Each workspace package gets an entry named `ros-{distro}-{package-name}` (underscores become dashes) with a `path` relative to the workspace root
+- Dependencies from your `package.xml` files are **not** written to `[dependencies]`; Pixi resolves them from the source packages when you run `pixi install`
+- Base ROS dependencies, compilers, and build tools are still added to `[dependencies]`
+- The `pixi-build` preview feature is enabled in `[workspace]`, since `[dev]` source dependencies require it
+
+Use `--dev` when you change `package.xml` files often: Pixi picks up dependency changes on the next `pixi install`, so you don't need to re-run `pixi-ros init`.
+Re-run it only when you add a new package to the workspace.
 
 ## Philosophy
 
