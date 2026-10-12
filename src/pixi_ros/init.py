@@ -57,91 +57,12 @@ def init_workspace(
     else:
         workspace_path = workspace_path.resolve()
 
-    # Resolve any relative or local path channels to file:// URIs for the validator
-    # (rattler Gateway requires absolute URIs). The original strings are kept for
-    # pixi.toml so pixi can handle them natively.
-    validator_channels = None
-    if channels:
-        validator_channels = []
-        for ch in channels:
-            p = Path(ch).expanduser()
-            if p.exists():
-                validator_channels.append(p.resolve().as_uri())
-            else:
-                validator_channels.append(ch)
-
-    typer.echo(f"Initializing ROS {distro} workspace at: {workspace_path}")
-
-    # Discover packages in workspace
-    try:
-        packages = discover_packages(workspace_path)
-        if not packages:
-            typer.echo(
-                "Warning: No ROS packages found in workspace. "
-                "Creating minimal pixi.toml.",
-                err=True,
-            )
-    except ValueError as e:
-        typer.echo(f"Error discovering packages: {e}", err=True)
-        raise typer.Exit(code=1) from e
-
-    if packages:
-        package_names = ", ".join(p.name for p in packages)
-        typer.echo(f"Found {len(packages)} package(s): {package_names}")
-
-    # Load or create pixi.toml
-    pixi_toml_path = workspace_path / "pixi.toml"
-    if pixi_toml_path.exists():
-        typer.echo(f"Updating existing {pixi_toml_path}")
-        try:
-            with open(pixi_toml_path) as f:
-                pixi_config = tomlkit.load(f)
-        except Exception as e:
-            typer.echo(f"Error reading pixi.toml: {e}", err=True)
-            raise typer.Exit(code=1) from e
-    else:
-        typer.echo(f"Creating new {pixi_toml_path}")
-        pixi_config = tomlkit.document()
-
-    # Create validator for package validation
-    validator = None
-    with console.status(
-        f"[cyan]Fetching ROS {distro} distribution index...[/cyan]",
-        spinner="dots",
-    ):
-        validator = RosDistroValidator(distro, extra_channels=validator_channels)
-
-    if validator._init_error:
-        typer.echo(
-            f"Warning: Could not initialize ROS distro validator: "
-            f"{validator._init_error}",
-            err=True,
-        )
-        typer.echo("Continuing with fallback package resolution...", err=True)
-        validator = None
-
-    # Display discovered dependencies
-    not_found_packages = _display_dependencies(packages, distro, validator)
-
-    # Update configuration
-    _ensure_workspace_section(pixi_config, workspace_path, platforms, dev=dev)
-    _ensure_channels(pixi_config, distro, channels)
-    _ensure_dependencies(
-        pixi_config, packages, distro, platforms, validator, not_found_packages, dev=dev
+    pixi_toml_path = update_manifest(
+        distro, workspace_path, platforms=platforms, channels=channels, dev=dev
     )
-    if dev:
-        _ensure_dev_source_dependencies(pixi_config, packages, distro, workspace_path)
-    _ensure_tasks(pixi_config)
-    _ensure_activation(pixi_config)
 
-    # Write pixi.toml
     try:
-        with open(pixi_toml_path, "w") as f:
-            tomlkit.dump(pixi_config, f)
-
-        # Create README_PIXI.md to help users
         _create_readme(workspace_path, distro)
-        _create_git_files(workspace_path)
         typer.secho(
             f"✓ Successfully initialized {pixi_toml_path}", fg="green", bold=True
         )
@@ -211,6 +132,94 @@ def init_workspace(
     except Exception as e:
         typer.echo(f"Error writing pixi.toml: {e}", err=True)
         raise typer.Exit(code=1) from e
+
+
+def update_manifest(
+    distro: str,
+    workspace_path: Path,
+    platforms: list[str] | None = None,
+    channels: list[str] | None = None,
+    dev: bool = False,
+    *,
+    strict: bool = False,
+) -> Path:
+    """Resolve workspace dependencies and write a native Pixi manifest.
+
+    Installation uses strict resolution so missing dependencies cannot silently
+    become comments in an apparently complete environment.
+    """
+    workspace_path = workspace_path.resolve()
+    pixi_toml_path = workspace_path / "pixi.toml"
+    try:
+        pixi_config = (
+            tomlkit.loads(pixi_toml_path.read_text())
+            if pixi_toml_path.exists()
+            else tomlkit.document()
+        )
+        packages = discover_packages(workspace_path)
+    except (OSError, ValueError) as e:
+        typer.echo(f"Error reading workspace: {e}", err=True)
+        raise typer.Exit(code=1) from e
+
+    typer.echo(f"Resolving ROS {distro} workspace at: {workspace_path}")
+    if packages:
+        typer.echo(
+            f"Found {len(packages)} package(s): "
+            + ", ".join(pkg.name for pkg in packages)
+        )
+
+    _ensure_workspace_section(pixi_config, workspace_path, platforms, dev=dev)
+    _ensure_channels(pixi_config, distro, channels)
+    platforms = list(pixi_config["workspace"]["platforms"])
+
+    # Include existing channels when resolving, not just CLI additions.
+    validator_channels = []
+    for channel in pixi_config["workspace"]["channels"]:
+        channel = channel if isinstance(channel, str) else channel["channel"]
+        path = Path(channel).expanduser()
+        if not path.is_absolute():
+            path = workspace_path / path
+        validator_channels.append(path.as_uri() if path.exists() else channel)
+
+    with console.status(f"Fetching ROS {distro} distribution index..."):
+        validator = RosDistroValidator(distro, extra_channels=validator_channels)
+    if validator._init_error:
+        typer.echo(
+            f"Warning: Could not initialize ROS distro validator: "
+            f"{validator._init_error}",
+            err=True,
+        )
+        if strict:
+            raise typer.Exit(code=1)
+        typer.echo("Continuing with fallback package resolution...", err=True)
+        validator = None
+
+    not_found = _display_dependencies(packages, distro, validator)
+    if strict and not_found:
+        typer.echo(
+            "Error: Unresolved ROS dependencies: "
+            + ", ".join(sorted(not_found))
+            + ". Add mappings in pixi-ros/*.yaml or supply --channel, then retry. "
+            "The manifest has not been changed.",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
+    _ensure_dependencies(
+        pixi_config, packages, distro, platforms, validator, not_found, dev=dev
+    )
+    if dev:
+        _ensure_dev_source_dependencies(pixi_config, packages, distro, workspace_path)
+    _ensure_tasks(pixi_config)
+    _ensure_activation(pixi_config, workspace_path)
+
+    try:
+        pixi_toml_path.write_text(tomlkit.dumps(pixi_config))
+    except OSError as e:
+        typer.echo(f"Error writing pixi.toml: {e}", err=True)
+        raise typer.Exit(code=1) from e
+    _create_git_files(workspace_path)
+    return pixi_toml_path
 
 
 def _display_dependencies(packages, distro: str, validator=None):
@@ -461,7 +470,9 @@ def _ensure_workspace_section(
 ):
     """Ensure workspace section exists with basic config."""
     if "workspace" not in config:
-        config["workspace"] = {}
+        # Pixi still accepts the legacy project table; migrate it without losing
+        # channels, platforms, or other user configuration.
+        config["workspace"] = config.pop("project", tomlkit.table())
 
     workspace = config["workspace"]
 
@@ -644,14 +655,23 @@ def _ensure_dependencies(
                 if not_found_from_display and ros_dep in not_found_from_display:
                     continue
 
-                # Map to conda packages WITHOUT validator (already validated in display)
-                conda_packages = map_ros_to_conda(
-                    ros_dep,
-                    distro,
-                    platform_override=mapping_platform,
-                    validator=None,
-                    workspace_packages=workspace_pkg_names,
-                )
+                # Keep the validator's resolved names (including custom channels
+                # and conda-forge), rather than re-guessing a ROS-prefixed name.
+                if validator:
+                    result = validator.validate_package(
+                        ros_dep,
+                        workspace_pkg_names,
+                        get_mappings(),
+                        platform_groups[mapping_platform][0],
+                    )
+                    conda_packages = result.conda_packages
+                else:
+                    conda_packages = map_ros_to_conda(
+                        ros_dep,
+                        distro,
+                        platform_override=mapping_platform,
+                        workspace_packages=workspace_pkg_names,
+                    )
 
                 # Skip if no conda packages were returned
                 if not conda_packages:
@@ -767,7 +787,7 @@ def _ensure_dependencies(
     if not dev:
         # Add package dependencies
         # Add common dependencies (available on all platforms)
-        if dep_sources:
+        if any(dep not in dependencies for dep in dep_sources):
             dependencies.add(tomlkit.nl())
             if len(mapping_platform_list) > 1:
                 dependencies.add(
@@ -1010,22 +1030,12 @@ def _ensure_tasks(config: dict):
     config["tasks"] = tasks
 
 
-def _ensure_activation(config: dict):
-    """Ensure activation section exists to source ROS setup."""
-    if "activation" not in config:
-        # Add comment before the activation section
-        config.add(tomlkit.nl())
-        config.add(
-            tomlkit.comment(
-                "Scripts to source on environment activation, "
-                "found after first colcon build."
-            )
-        )
-        config["activation"] = tomlkit.table()
-        config["activation"]["scripts"] = ["install/setup.bash"]
-    elif "scripts" not in config["activation"]:
-        # Just add scripts if activation exists but scripts don't
-        config["activation"]["scripts"] = ["install/setup.bash"]
+def _ensure_activation(config: dict, workspace_path: Path):
+    """Source a built workspace overlay only when it exists."""
+    script = "install/setup.bat" if os.name == "nt" else "install/setup.bash"
+    if (workspace_path / script).is_file():
+        activation = config.setdefault("activation", tomlkit.table())
+        activation.setdefault("scripts", [script])
 
 
 def _create_readme(workspace_path: Path, distro: str):

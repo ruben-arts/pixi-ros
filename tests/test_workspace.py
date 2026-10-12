@@ -114,29 +114,96 @@ def test_is_workspace_package():
     assert not is_workspace_package("nonexistent_pkg", packages)
 
 
-def test_find_workspace_root_single_package():
-    """Test finding workspace root for single-package workspace."""
-    with TemporaryDirectory() as tmpdir:
-        tmppath = Path(tmpdir).resolve()
+@pytest.mark.parametrize("subdirectory", [".", "src/internal"])
+def test_find_workspace_root_single_package(tmp_path, subdirectory):
+    """Standalone packages must not include neighboring packages."""
+    package_dir = tmp_path / "package"
+    package_dir.mkdir()
+    (package_dir / "package.xml").touch()
+    sibling = tmp_path / "sibling"
+    sibling.mkdir()
+    (sibling / "package.xml").touch()
+    start = package_dir / subdirectory
+    start.mkdir(parents=True, exist_ok=True)
 
-        # Create a simple package.xml
-        pkg_xml = tmppath / "package.xml"
-        pkg_xml.write_text(
-            """<?xml version="1.0"?>
-        <package format="3">
-            <name>test_pkg</name>
-            <version>0.1.0</version>
-            <description>Test</description>
-            <maintainer email="test@test.com">Test</maintainer>
-            <license>MIT</license>
-        </package>
-        """
-        )
+    assert find_workspace_root(start) == package_dir
 
-        # Should find the package
-        result = find_package_xml(tmppath)
-        assert result is not None
-        assert result.resolve() == pkg_xml.resolve()
+
+@pytest.mark.parametrize(
+    "subdirectory", [".", "src", "src/repos", "src/repos/pkg", "src/repos/pkg/src"]
+)
+def test_find_workspace_root_nested_src_workspace(tmp_path, subdirectory):
+    """An unrelated ancestor manifest must not swallow a ROS workspace."""
+    (tmp_path / "pixi.toml").touch()
+    workspace = tmp_path / "workspace"
+    package_dir = workspace / "src" / "repos" / "pkg"
+    (package_dir / "src").mkdir(parents=True)
+    (package_dir / "package.xml").touch()
+
+    assert find_workspace_root(workspace / subdirectory) == workspace
+
+
+@pytest.mark.parametrize("subdirectory", [".", "tools/nested", "src/repos"])
+def test_find_workspace_root_manifest_only(tmp_path, subdirectory):
+    """Existing manifests remain discoverable before ROS packages are added."""
+    (tmp_path / "pixi.toml").touch()
+    start = tmp_path / subdirectory
+    start.mkdir(parents=True, exist_ok=True)
+
+    assert find_workspace_root(start) == tmp_path
+
+
+def test_find_workspace_root_manifest_contains_flat_packages(tmp_path):
+    (tmp_path / "pixi.toml").touch()
+    package_dir = tmp_path / "repos" / "package"
+    start = package_dir / "src"
+    start.mkdir(parents=True)
+    (package_dir / "package.xml").touch()
+
+    assert find_workspace_root(start) == tmp_path
+
+
+def test_find_workspace_root_nearest_manifest_inside_src(tmp_path):
+    """A nested explicit manifest takes precedence over the src convention."""
+    (tmp_path / "pixi.toml").touch()
+    repository = tmp_path / "src" / "repository"
+    package_dir = repository / "package"
+    package_dir.mkdir(parents=True)
+    (package_dir / "package.xml").touch()
+    (repository / "pixi.toml").touch()
+
+    assert find_workspace_root(package_dir) == repository
+
+
+def test_find_workspace_root_does_not_search_siblings(tmp_path):
+    start = tmp_path / "empty"
+    start.mkdir()
+    sibling = tmp_path / "src" / "package"
+    sibling.mkdir(parents=True)
+    (sibling / "package.xml").touch()
+
+    assert find_workspace_root(start) is None
+
+
+def test_find_workspace_root_ignores_excluded_packages(tmp_path):
+    """Ignored packages cannot establish a workspace or a src boundary."""
+    for directory in (
+        ".hidden",
+        "build",
+        "install",
+        "log",
+        "test",
+        "tests",
+        "src/ignored",
+        "src/colcon_ignored",
+    ):
+        package_dir = tmp_path / directory
+        package_dir.mkdir(parents=True)
+        (package_dir / "package.xml").touch()
+    (tmp_path / ".gitignore").write_text("src/ignored/\n")
+    (tmp_path / "src" / "colcon_ignored" / "COLCON_IGNORE").touch()
+
+    assert find_workspace_root(tmp_path) is None
 
 
 def test_discover_packages_empty_workspace():

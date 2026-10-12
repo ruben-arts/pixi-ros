@@ -6,6 +6,7 @@ import typer
 from rattler import Platform
 
 from pixi_ros.init import init_workspace
+from pixi_ros.install import install_workspace
 from pixi_ros.mappings import get_platforms, get_ros_distros
 
 app = typer.Typer(
@@ -20,6 +21,34 @@ pkg_app = typer.Typer(
     context_settings={"help_option_names": ["-h", "--help"]},
 )
 app.add_typer(pkg_app, name="pkg")
+
+
+@app.command()
+def install(
+    distro: Annotated[
+        str | None,
+        typer.Option("--distro", "-d", help="ROS distribution; inferred or prompted."),
+    ] = None,
+    platforms: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--platform",
+            "-p",
+            help="Additional target platforms. "
+            "Defaults to this machine for new workspaces.",
+        ),
+    ] = None,
+    channels: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--channel",
+            "-c",
+            help="Additional dependency channels. Can be specified multiple times.",
+        ),
+    ] = None,
+):
+    """Resolve and install a ROS workspace, with or without pixi.toml."""
+    install_workspace(distro, platforms=platforms, channels=channels)
 
 
 @app.command()

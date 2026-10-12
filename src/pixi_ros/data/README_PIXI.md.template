@@ -6,41 +6,63 @@ This ROS {distro} workspace is configured to use [Pixi](https://pixi.sh) for dep
 
 ### 1. Install dependencies
 
-```bash
-pixi install
-```
-
-### 2. Build the workspace
+Run this from the workspace:
 
 ```bash
-pixi run build
+pixi-ros install
 ```
 
-### 3. Run tests
+`pixi-ros` refreshes dependencies from your `package.xml` files and runs `pixi install`.
+It reuses your root `pixi.toml` and preserves existing configuration.
+It can also create the manifest for a new workspace, so you don't need to run `init` first.
+Pixi must already be installed.
 
-```bash
-pixi run test
-```
+The distro is inferred from existing ROS dependencies or channels.
+If it can't be inferred, you'll be prompted; `ROS_DISTRO` can supply the prompt default.
+Resolve conflicting distro settings before installing.
+A new workspace defaults to the current platform, while existing workspace platforms are retained.
+Use `--distro {distro}` to select the distro explicitly, repeated `--platform` options for target platforms, and repeated `--channel` options for additional channels.
 
-### 4. Activate the environment
+If you've already reviewed the manifest and only need to install its dependencies, use `pixi install` directly.
+Commit `pixi.toml` and `pixi.lock` so others can reproduce the environment.
+
+### 2. Activate the environment
 
 ```bash
 pixi shell
 ```
 
-This starts a new shell with the ROS environment activated. You can also prefix any command
-with `pixi run <command>` without entering the shell.
+This starts a shell with the ROS environment activated.
+You can also use `pixi run <command>` without entering the shell.
 
-> **Note:** After the first `pixi run build`, pixi will automatically source
-> `install/setup.bash` on environment activation. This means all your built packages
-> are available without any manual sourcing.
+### 3. Build and test the workspace
+
+Installing dependencies doesn't build your local ROS packages.
+Run the build separately:
+
+```bash
+pixi run build
+pixi run test
+```
+
+After building, run `pixi-ros install` again to register the workspace setup script for subsequent environment activations.
+
+### Optional: Generate the manifest without installing
+
+```bash
+pixi-ros init --distro {distro}
+```
+
+`init` configures the manifest and generates this guide, but doesn't install dependencies.
+The advanced `init --dev` mode writes workspace source dependencies into `[dev]` for Pixi to resolve at install time.
+`pixi-ros install` preserves existing source dependencies and doesn't generate a README.
 
 ## Adding dependencies
 
-When you add dependencies to your `package.xml` files, re-run `pixi ros init` to update `pixi.toml`:
+When you change dependencies in your `package.xml` files, refresh and install them:
 
 ```bash
-pixi ros init --distro {distro}
+pixi-ros install
 ```
 
 To add a conda package directly:
@@ -57,17 +79,18 @@ pixi add --pypi <package-name>
 
 ## Unavailable packages
 
-If `pixi.toml` contains commented-out lines marked `# NOT FOUND`, those packages could not be
-resolved from the default channels. Options:
+If `pixi.toml` contains commented-out lines marked `# NOT FOUND`, those packages couldn't be resolved.
+`pixi-ros install` won't report a complete installation while dependencies are unresolved or unavailable.
+Fix the reported dependencies and run it again.
 
-1. **Use a custom channel** — re-run init with `--channel` if the package lives elsewhere:
+1. **Use a custom channel** if the package lives elsewhere:
    ```bash
-   pixi ros init --distro {distro} --channel https://prefix.dev/my-channel
+   pixi-ros install --distro {distro} --channel https://prefix.dev/my-channel
    ```
-2. **Add the channel manually** — `pixi project channel add <channel-url>`
-3. **Check the package name** — verify spelling in your `package.xml`
-4. **Install via PyPI** — `pixi add --pypi <package-name>`
-5. **Contribute to RoboStack** — if the package is missing from the default ROS channel:
+2. **Check the package name**: verify spelling in your `package.xml`.
+3. **Add a mapping** in `pixi-ros/*.yaml` if the conda package uses a different name.
+4. **Add package source to the workspace** if you need to build it locally.
+5. **Contribute to RoboStack** if the package is missing from the default ROS channel:
    - [ros-humble](https://github.com/RoboStack/ros-humble)
    - [ros-jazzy](https://github.com/RoboStack/ros-jazzy)
    - [ros-kilted](https://github.com/RoboStack/ros-kilted)
@@ -87,16 +110,15 @@ Run commands through pixi: `pixi run <command>` or enter the shell with `pixi sh
 
 ### Active ROS environment conflict
 
-If `pixi ros init` warns about an "Active ROS environment detected", you have a ROS installation
-sourced in your shell. Remove or comment out any lines like the following from `~/.bashrc` or
-`~/.zshrc` and restart your shell:
+If you have a ROS installation sourced in your shell, it can conflict with Pixi's environment.
+Remove or comment out lines like these from `~/.bashrc` or `~/.zshrc`, then restart your shell:
 
 ```bash
 # source /opt/ros/{distro}/setup.bash
 # source ~/ros_ws/install/setup.bash
 ```
 
-Pixi manages the ROS environment automatically — no manual sourcing needed.
+Pixi manages ROS activation, so you don't need to source another ROS installation manually.
 
 ## Learn more
 

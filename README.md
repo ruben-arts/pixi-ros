@@ -1,9 +1,10 @@
 # pixi-ros
 
-**Bridge your ROS workspace to the modern conda/Pixi ecosystem**
+**Install your ROS workspace dependencies with Pixi**
 
-pixi-ros helps ROS developers transition from `rosdep` to [Pixi](https://pixi.sh) for package management.
-It automatically reads your ROS workspace's `package.xml` files and generates a `pixi.toml` manifest with all dependencies resolved from conda channels (primarily [robostack](https://robostack.org/)).
+Your ROS packages already declare their dependencies in `package.xml`.
+`pixi-ros install` reads them, maps external dependencies to conda packages (primarily from [RoboStack](https://robostack.org/)), and installs them with [Pixi](https://pixi.sh).
+Then use plain `pixi shell` or `pixi run build`.
 
 ## Quick Start
 
@@ -23,45 +24,55 @@ Install pixi-ros globally using pixi:
 pixi global install pixi-ros
 ```
 
-### Initialize Your ROS Workspace
+### Install Your Workspace Dependencies
 
-Navigate to your ROS workspace and run:
+Run this from your ROS workspace:
+
+```bash
+pixi-ros install
+```
+
+There's no `init` prerequisite.
+The command discovers your workspace and creates `pixi.toml` at its root, or updates an existing manifest while preserving your configuration.
+It resolves dependencies from your `package.xml` files, adds build tasks, then runs `pixi install`.
+Pixi must be installed first.
+
+Choose the ROS distribution when prompted, or pass `--distro humble`.
+`pixi-ros` infers the distro from existing ROS dependencies or channels; otherwise it prompts, using `ROS_DISTRO` as a default when available.
+Conflicting distro settings need to be resolved rather than mixing ROS distributions.
+A new workspace targets your current platform by default.
+Existing workspace platforms are retained; use repeated `--platform` options to add other targets.
+
+### Enter the Environment and Build
+
+```bash
+pixi shell
+```
+
+The shell has the ROS environment activated.
+Installing dependencies doesn't build the ROS packages in your workspace.
+Build those separately, with or without entering a shell:
+
+```bash
+pixi run build
+pixi run test
+```
+
+When your `package.xml` files change, run `pixi-ros install` again to refresh and install their dependencies.
+For day-to-day work, use Pixi directly.
+Commit `pixi.toml` and the `pixi.lock` that Pixi creates so your teammates can reproduce the environment with `pixi install`.
+
+### Only Generate the Manifest
+
+If you want to inspect or edit the manifest before installing anything, use `init`:
 
 ```bash
 pixi-ros init --distro humble
-```
-
-This will:
-1. Discover all ROS packages in your workspace (by finding `package.xml` files)
-2. Read dependencies from each `package.xml`
-3. **Validate and resolve** each dependency using the priority system:
-   - Skip workspace packages (built locally)
-   - Use custom mappings from YAML files
-   - Query ROS distro index for ROS packages
-   - Auto-detect packages on conda-forge
-   - Flag packages that can't be found
-4. Generate/update `pixi.toml` with proper channels and dependencies
-5. Check package availability in conda channels for each platform
-6. Create helpful build/test/clean tasks
-7. Display detailed validation results with source information
-
-### Install and Build
-
-After initialization, use standard pixi commands:
-
-```bash
-# Install all dependencies
 pixi install
-
-# Build your workspace
-pixi run build
-
-# Run tests
-pixi run test
-
-# Activate environment for direct ROS commands
-pixi shell
 ```
+
+`init` is a manifest-only handoff: it configures the workspace and generates a `README_PIXI.md` usage guide, but doesn't run `pixi install`.
+`pixi-ros install` doesn't generate that guide.
 
 ## How It Works
 
@@ -78,7 +89,7 @@ When resolving a ROS package dependency, `pixi-ros` checks sources in this order
 3. **ROS distribution** → Query the official ROS distro index for `ros-{distro}-{package}` packages
 4. **conda-forge** (auto-detection) → Search conda-forge for packages without ros-distro prefix
 5. **Custom channels** → Search any channels supplied via `--channel` (see below)
-6. **NOT FOUND** → Mark as unavailable and comment out in `pixi.toml`
+6. **NOT FOUND** → Stop installation; `init` alone leaves these as comments in `pixi.toml`
 
 #### Package Sources
 
@@ -89,7 +100,7 @@ The dependency tables show where each package comes from:
 - **conda-forge**: Auto-detected packages available directly on conda-forge
 - **{custom-channel-name}**: Package found in a custom channel (shown in purple, named after the channel)
 - **Workspace**: Local packages in your workspace (skipped from dependencies)
-- **NOT FOUND**: Packages that couldn't be resolved (commented out in `pixi.toml`)
+- **NOT FOUND**: Packages that couldn't be resolved. Installation stops; `init` leaves them commented out in `pixi.toml`.
 
 The mapping rules are defined in YAML files (see `src/pixi_ros/data/conda-forge.yaml`) and can be customized by placing your own mapping files in `pixi-ros/*.yaml` or `~/.pixi-ros/*.yaml`.
 
@@ -97,7 +108,8 @@ After dependency resolution, `pixi-ros` validates package availability in the co
 
 ### Example Output
 
-When you run `pixi-ros init --distro humble`, you'll see validation results:
+Dependency resolution shows where each package was found.
+For example:
 
 ```
 Found 2 package(s): my_package, other_package
@@ -130,7 +142,7 @@ Given a `package.xml` with:
 <exec_depend>std_msgs</exec_depend>
 ```
 
-`pixi-ros init --distro humble` generates a `pixi.toml` with:
+The generated `pixi.toml` includes dependencies such as:
 
 ```toml
 [dependencies]
@@ -177,7 +189,7 @@ Given a `package.xml` with version constraints:
 <exec_depend version_eq="1.2.3">boost</exec_depend>
 ```
 
-`pixi-ros init` generates:
+These constraints are written to `pixi.toml`:
 
 ```toml
 [dependencies]
@@ -188,9 +200,32 @@ boost = "==1.2.3"
 
 ## Command Reference
 
+### `pixi-ros install`
+
+Resolve and install external dependencies for the current ROS workspace.
+Creates or updates the root `pixi.toml`, then invokes `pixi install`.
+It doesn't build local ROS packages.
+
+```bash
+pixi-ros install
+pixi-ros install --distro humble
+pixi-ros install -d humble -p linux-64 -p osx-arm64
+pixi-ros install -d humble -c https://prefix.dev/my-org
+```
+
+**Options:**
+- `--distro`, `-d`: ROS distribution. Inferred from existing ROS dependencies or channels when omitted; otherwise prompts, with `ROS_DISTRO` as a possible default. Conflicting or ambiguous settings must be resolved.
+- `--platform`, `-p`: Target platform, repeatable. New workspaces default to the current platform; existing platforms are retained.
+- `--channel`, `-c`: Additional channel to search, repeatable. Accepts channel URLs or local paths.
+
+Existing manifest settings are preserved while workspace dependencies are refreshed.
+Run the command again after changing `package.xml` files.
+Unresolved or unavailable dependencies prevent a successful installation; fix the reported dependencies rather than treating the environment as complete.
+Pixi handles the environment and `pixi.lock`, so you can use `pixi install`, `pixi shell`, and `pixi run` directly afterward.
+
 ### `pixi-ros init`
 
-Initialize or update a ROS workspace's `pixi.toml`.
+Initialize or update a ROS workspace's `pixi.toml` without installing dependencies.
 
 ```bash
 pixi-ros init --distro <ros_distro>
@@ -206,6 +241,7 @@ pixi-ros init
 - `--channel`, `-c`: Additional channels to search for packages (optional, can be specified multiple times)
   - Accepts URLs (`https://prefix.dev/my-channel`) or local paths (`./my-channel`, `~/channels/my-channel`)
   - Channels are added to `pixi.toml` with higher priority than the default robostack and conda-forge channels
+- `--dev`: Add workspace packages as source dependencies in `[dev]`, pointing to their `package.xml` files, instead of writing all resolved external dependencies into the manifest. Enables the `pixi-build` preview so Pixi can resolve these at install time.
 
 **What it does:**
 - Scans workspace for `package.xml` files
@@ -222,6 +258,18 @@ pixi-ros init
 
 **Running multiple times:**
 The command is idempotent - you can run it multiple times to update dependencies as your workspace changes.
+
+### Advanced: Source Dependencies with `init --dev`
+
+Use `init --dev` if you want Pixi to resolve workspace package source dependencies at install time:
+
+```bash
+pixi-ros init --distro humble --dev
+pixi install
+```
+
+This is an alternative to the classic dependency resolution used by `pixi-ros install`.
+The `install` command doesn't have a `--dev` option.
 
 ## Multi-Platform Support
 
@@ -281,7 +329,8 @@ libopengl-devel = "*"
 
 ### Interactive Platform Selection
 
-If you don't specify platforms, you'll be prompted:
+`init` prompts for platforms when you don't specify them.
+`install` uses the current platform for new workspaces and retains platforms from an existing manifest.
 
 ```bash
 $ pixi-ros init --distro humble
@@ -297,7 +346,8 @@ Select platforms (enter numbers or names, comma or space separated): 1 3
 
 ## Custom Channels
 
-If your workspace depends on packages that live outside the default robostack and conda-forge channels — for example, internal builds or early-access ROS packages — you can point `pixi-ros` at additional channels with `--channel` / `-c`.
+If your workspace depends on packages outside the default RoboStack and conda-forge channels, pass additional channels with `--channel` / `-c`.
+Both `install` and `init` accept this option.
 
 ```bash
 # Single custom channel
@@ -318,7 +368,7 @@ Custom channels are written to `pixi.toml` **before** the default channels, givi
 ```toml
 [workspace]
 channels = [
-    "https://prefix.dev/my-org",          # custom — highest priority
+    "https://prefix.dev/my-org",          # custom, highest priority
     "https://prefix.dev/robostack-kilted", # default
     "https://prefix.dev/conda-forge",      # default
 ]
@@ -333,7 +383,7 @@ pixi-ros init --distro kilted --channel ./tests/data/my-channel
 ```
 
 ```toml
-# pixi.toml — relative path kept intact
+# pixi.toml: relative path kept intact
 channels = [
     "./tests/data/my-channel",
     "https://prefix.dev/robostack-kilted",
@@ -355,7 +405,7 @@ Think of it as a "gateway" to help ROS developers benefit from modern package ma
 
 ## Project Structure
 
-After initialization, your workspace will have:
+After `pixi-ros install`, your workspace has a root manifest and Pixi lockfile:
 
 ```
 workspace/
@@ -364,9 +414,11 @@ workspace/
 │       ├── package.xml    # ROS package manifest (source of truth)
 │       └── ...
 ├── pixi.toml              # Generated pixi manifest
-├── pixi.lock              # Locked dependencies (commit this!)
-└── README_PIXI.md         # Generated usage guide
+└── pixi.lock              # Locked dependencies (commit this!)
 ```
+
+The optional `init` command also generates `README_PIXI.md`.
+It doesn't create the lockfile; Pixi does that when you install.
 
 ## Troubleshooting
 
@@ -441,6 +493,8 @@ Contributions welcome! Feel free to open issues or PRs on GitHub.
 
 ## Disclaimer
 
-This tool is build with heavy use of AI assistance and is under active development. Please report issues or contribute on GitHub!
+This tool is built with heavy use of AI assistance and is under active development.
+Please report issues or contribute on GitHub!
 
-I (Ruben) hope `pixi-ros` can die ASAP, as all of the workflows this tool provides should ideally be native to Pixi itself. But until then, I hope this initialization tool helps you get started!
+I (Ruben) hope `pixi-ros` can die ASAP, as all of the workflows this tool provides should ideally be native to Pixi itself.
+Until then, use it to install your ROS dependencies and let Pixi take it from there!

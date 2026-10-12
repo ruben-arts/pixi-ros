@@ -782,54 +782,6 @@ def test_dev_flag_path_is_relative_to_workspace():
         assert resolved == pkg_xml.resolve()
 
 
-def test_ros_environment_warning_shown_when_ros_sourced():
-    """Test that warning is shown when ROS environment is detected."""
-    from rich.console import Console
-
-    from pixi_ros.init import init_workspace
-
-    with TemporaryDirectory() as tmpdir:
-        workspace_path = Path(tmpdir)
-        src_dir = workspace_path / "src"
-        src_dir.mkdir()
-
-        # Create a simple package.xml
-        pkg_xml = src_dir / "package.xml"
-        pkg_xml.write_text("""<?xml version="1.0"?>
-<package format="2">
-    <name>test_pkg</name>
-    <version>0.0.1</version>
-    <description>Test</description>
-    <maintainer email="test@test.com">Test</maintainer>
-    <license>MIT</license>
-</package>
-""")
-
-        # Mock environment with ROS_DISTRO set (simulating sourced ROS environment)
-        with patch.dict("os.environ", {"ROS_DISTRO": "noetic"}):
-            # Capture console output
-            output = StringIO()
-            test_console = Console(file=output, force_terminal=True, width=120)
-
-            # Mock the console in the init module
-            with patch("pixi_ros.init.console", test_console):
-                # Initialize workspace
-                init_workspace("humble", workspace_path, platforms=["linux-64"])
-
-            # Get the output
-            output_text = output.getvalue()
-
-            # Check that the warning is present
-            assert "Active ROS environment detected!" in output_text, (
-                "Warning about ROS environment should be shown"
-            )
-            assert "source /opt/ros/" in output_text, "Should mention source /opt/ros/"
-            assert "source install/setup.bash" in output_text, (
-                "Should mention source install/setup.bash"
-            )
-            assert "~/.bashrc" in output_text, "Should mention ~/.bashrc as an example"
-
-
 def test_ros_environment_warning_not_shown_when_not_sourced():
     """Test that warning is NOT shown when ROS environment is not detected."""
     from rich.console import Console

@@ -12,14 +12,12 @@ def test_app_help():
     result = runner.invoke(app, ["--help"])
     assert result.exit_code == 0
     assert "pixi-ros" in result.stdout
-    assert "Pixi extension for ROS package management" in result.stdout
 
 
 def test_init_help():
     """Test that init help command works."""
     result = runner.invoke(app, ["init", "--help"])
     assert result.exit_code == 0
-    assert "Initialize pixi.toml for a ROS workspace" in result.stdout
     assert "distro" in result.stdout.lower()  # Check for distro argument
 
 

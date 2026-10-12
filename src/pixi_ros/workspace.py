@@ -1,10 +1,13 @@
 """Workspace discovery and management for ROS packages."""
 
+from collections.abc import Iterator
 from pathlib import Path
 
 import pathspec
 
 from pixi_ros.package_xml import PackageXML
+
+_SKIP_DIRS = {"build", "install", "log", ".pixi", "tests", "test"}
 
 
 def load_gitignore_spec(workspace_root: Path) -> pathspec.PathSpec | None:
@@ -59,75 +62,81 @@ def find_package_xml(start_path: Path | None = None) -> Path | None:
 
 
 def find_workspace_root(start_path: Path | None = None) -> Path | None:
+    """Find a manifest or ROS workspace without searching ancestor trees.
+
+    A recognizable ``src`` workspace takes precedence over unrelated ancestor
+    manifests. Within that boundary, the nearest manifest wins. Without either,
+    use the enclosing package itself or the package-bearing starting directory.
     """
-    Find the workspace root by looking for a directory with ROS package.xml files.
+    current = (start_path if start_path is not None else Path.cwd()).resolve()
+    if not current.is_dir():
+        return None
 
-    Searches recursively for package.xml files, excluding hidden directories and
-    build artifacts. Returns the directory containing packages, or the parent of
-    a 'src' directory if packages are organized in that structure.
-
-    Args:
-        start_path: Starting directory for search (defaults to cwd)
-
-    Returns:
-        Path to workspace root if found, None otherwise
-    """
-    if start_path is None:
-        start_path = Path.cwd()
-
-    current = start_path.resolve()
-    skip_dirs = {"build", "install", "log", ".pixi"}
-
-    # Helper to check if a directory has package.xml files
-    def has_packages(path: Path) -> bool:
-        """Check if path contains any package.xml files (recursively)."""
-        gitignore_spec = load_gitignore_spec(path)
-
-        def _contains_package(directory: Path) -> bool:
-            if (directory / "COLCON_IGNORE").exists():
-                return False
-            if (directory / "package.xml").exists():
-                relative_path = (directory / "package.xml").relative_to(path)
-                if not (
-                    gitignore_spec and gitignore_spec.match_file(str(relative_path))
-                ):
-                    return True
-            for child in directory.iterdir():
-                if not child.is_dir():
-                    continue
-                if child.name.startswith(".") or child.name in skip_dirs:
-                    continue
-                relative_child = child.relative_to(path)
-                if gitignore_spec and gitignore_spec.match_file(str(relative_child)):
-                    continue
-                if _contains_package(child):
-                    return True
-            return False
-
-        return _contains_package(path)
-
-    # First, check if we're inside a package - search upward for package.xml
-    package_xml = find_package_xml(current)
-    if package_xml:
-        # We found a package.xml, so determine the workspace root
-        package_dir = package_xml.parent
-        potential_src = package_dir.parent
-
-        # Check if parent directory is named 'src'
-        if potential_src.name == "src":
-            # The workspace root is the parent of 'src'
-            return potential_src.parent
-
-        # Otherwise, return the parent of the package directory
-        return package_dir.parent
-
-    # Check if current directory has any packages
-    if has_packages(current):
-        if current.name == "src":
-            return current.parent
+    ancestors = (current, *current.parents)
+    manifest_root = next(
+        (path for path in ancestors if (path / "pixi.toml").is_file()), None
+    )
+    if manifest_root == current:
         return current
 
-    return None
+    package_xml = find_package_xml(current)
+    package_root = package_xml.parent if package_xml else None
+    # A package's own source-code directory is not a workspace boundary.
+    workspace_ancestors = package_root.parents if package_root else ancestors
+    src_dir = next((path for path in workspace_ancestors if path.name == "src"), None)
+    ros_root = None
+    has_packages = package_root is not None
+    if package_root:
+        if src_dir:
+            ros_root = src_dir.parent
+    else:
+        # Only descend into the invocation directory, never an ancestor that
+        # might contain unrelated sibling repositories or packages.
+        for package_path in _iter_package_xml(current):
+            has_packages = True
+            if src_dir:
+                ros_root = src_dir.parent
+                break
+            if package_path.is_relative_to(current / "src"):
+                ros_root = current
+                break
+
+    if ros_root and (
+        manifest_root is None or not manifest_root.is_relative_to(ros_root)
+    ):
+        return ros_root
+    if manifest_root:
+        return manifest_root
+    if package_root:
+        return package_root
+    return current if has_packages else None
+
+
+def _iter_package_xml(workspace_root: Path) -> Iterator[Path]:
+    """Walk package markers using the same exclusions for root and discovery."""
+    gitignore_spec = load_gitignore_spec(workspace_root)
+
+    def _walk(directory: Path) -> Iterator[Path]:
+        if (directory / "COLCON_IGNORE").exists():
+            return
+
+        package_xml_path = directory / "package.xml"
+        if package_xml_path.is_file():
+            relative_path = package_xml_path.relative_to(workspace_root)
+            if not (gitignore_spec and gitignore_spec.match_file(str(relative_path))):
+                yield package_xml_path
+
+        for child in sorted(directory.iterdir()):
+            if not child.is_dir():
+                continue
+            if child.name.startswith(".") or child.name in _SKIP_DIRS:
+                continue
+            relative_child = child.relative_to(workspace_root)
+            if gitignore_spec and gitignore_spec.match_file(str(relative_child)):
+                continue
+            yield from _walk(child)
+
+    yield from _walk(workspace_root)
 
 
 def discover_packages(workspace_root: Path) -> list[PackageXML]:
@@ -154,38 +163,11 @@ def discover_packages(workspace_root: Path) -> list[PackageXML]:
 
     packages = []
 
-    # Directories to skip during recursive search
-    skip_dirs = {"build", "install", "log", ".pixi", "tests", "test"}
-
-    # Load gitignore patterns if available
-    gitignore_spec = load_gitignore_spec(workspace_root)
-
-    def _walk(directory: Path) -> None:
-        """Recursively walk directory, skipping pruned subdirs."""
-        # A COLCON_IGNORE file in this directory means skip it entirely
-        if (directory / "COLCON_IGNORE").exists():
-            return
-
-        package_xml_path = directory / "package.xml"
-        if package_xml_path.exists():
-            relative_path = package_xml_path.relative_to(workspace_root)
-            if not (gitignore_spec and gitignore_spec.match_file(str(relative_path))):
-                try:
-                    packages.append(PackageXML.from_file(package_xml_path))
-                except (FileNotFoundError, ValueError) as e:
-                    print(f"Warning: Could not parse {package_xml_path}: {e}")
-
-        for child in sorted(directory.iterdir()):
-            if not child.is_dir():
-                continue
-            if child.name.startswith(".") or child.name in skip_dirs:
-                continue
-            relative_child = child.relative_to(workspace_root)
-            if gitignore_spec and gitignore_spec.match_file(str(relative_child)):
-                continue
-            _walk(child)
-
-    _walk(workspace_root)
+    for package_xml_path in _iter_package_xml(workspace_root):
+        try:
+            packages.append(PackageXML.from_file(package_xml_path))
+        except (FileNotFoundError, ValueError) as e:
+            print(f"Warning: Could not parse {package_xml_path}: {e}")
     return packages
 
 
