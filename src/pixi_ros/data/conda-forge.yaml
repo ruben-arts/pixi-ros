@@ -16,6 +16,10 @@ assimp:
   pixi: [assimp]
 assimp-dev:
   pixi: [assimp]
+autoconf:
+  robostack: [autoconf]
+automake:
+  robostack: [automake]
 avahi-daemon:
   pixi: [python-avahi]
 benchmark:
